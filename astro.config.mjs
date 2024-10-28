@@ -4,6 +4,8 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
+	site: 'https://thomaspeire.github.io',
+	base: '/peernotes',
 	integrations: [
 		starlight({
 			title: 'PeerNotes',
@@ -13,10 +15,7 @@ export default defineConfig({
 			sidebar: [
 				{
 					label: 'Cheatsheets',
-					items: [
-						// Each item here is one entry in the navigation menu.
-						{ label: 'Git', slug: 'cheatsheets/git-cheat-sheet' },
-					],
+					autogenerate: { directory: 'cheatsheets' },
 				},
 				{
 					label: 'Reference',
