@@ -13,7 +13,10 @@ export default defineConfig({
 			sidebar: [
 				{
 					label: 'Cheatsheets',
-					autogenerate: { directory: 'cheatsheets' },
+					items: [
+						// Each item here is one entry in the navigation menu.
+						{ label: 'Git', slug: 'cheatsheets/git-cheat-sheet' },
+					],
 				},
 				{
 					label: 'Reference',
