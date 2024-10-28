@@ -1,11 +1,14 @@
 ---
-title: Example Reference
-description: A reference page in my new Starlight docs site.
+title: WIP Reference
+description: A work in progress reference page.
 ---
 
-Reference pages are ideal for outlining how things work in terse and clear terms.
-Less concerned with telling a story or addressing a specific use case, they should give a comprehensive outline of what you're documenting.
+[//]: # (Reference pages are ideal for outlining how things work in terse and clear terms.)
 
-## Further reading
+[//]: # (Less concerned with telling a story or addressing a specific use case, they should give a comprehensive outline of what you're documenting.)
 
-- Read [about reference](https://diataxis.fr/reference/) in the Diátaxis framework
+[//]: # ()
+[//]: # (## Further reading)
+
+[//]: # ()
+[//]: # (- Read [about reference]&#40;https://diataxis.fr/reference/&#41; in the Diátaxis framework)
