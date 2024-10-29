@@ -1,0 +1,75 @@
+﻿---
+title: Creating a Bootable VHDX with Windows
+description: Step-by-step guide to creating a bootable VHDX using Diskpart, applying a Windows image, and configuring the boot entry.
+---
+
+This guide walks you through creating a Virtual Hard Disk (VHDX) with a Windows installation that can be booted directly. This is useful for setting up test environments, backups, or portable Windows installations.
+
+## Prerequisites
+
+1. A Windows installation file in `.wim` format (such as `install.wim` from Windows installation media).
+2. Administrator privileges on your machine.
+
+---
+
+## Steps to Create a Bootable VHDX
+
+### 1. Create the VHDX Using Diskpart
+
+Open Diskpart and follow these commands to create a fixed-size VHDX, attach it, and prepare it with a primary partition.
+
+```powershell
+# Open Diskpart
+diskpart 
+
+# Create a VHDX with a size of 25 GB
+create vdisk file=C:\windows.vhdx maximum=25600 type=fixed 
+
+# Attach the VHDX 
+attach vdisk 
+
+# Create a partition for the Windows files, format it, and assign it a drive letter 
+create partition primary 
+format quick label=vhdx 
+assign letter=v 
+
+# Exit Diskpart
+exit
+```
+
+### 2. Apply the Windows Image to the VHDX
+
+Use the Deployment Image Servicing and Management (DISM) tool to apply the Windows image to your newly created VHDX.
+
+```powershell
+# Get the index of the Windows installation that you want to deploy
+dism /Get-WimInfo /WimFile:install.wim 
+
+# Apply the WIM file with the correct index (replace `index` as needed)
+dism /Apply-Image /ImageFile:install.wim /index:1 /ApplyDir:V:\
+```
+
+### 3. Add a Boot Entry
+
+To boot from the VHDX, add a new boot entry using the `bcdboot` command.
+
+```powershell
+# Add boot entry for the new VHD
+bcdboot V:\Windows /d
+```
+
+### 4. Verify the Boot Configuration
+
+Finally, confirm that the boot entry was successfully added and is properly configured by using the `bcdedit` command.
+
+```powershell
+# List all boot entries to verify the new entry
+bcdedit /enum all
+```
+
+---
+
+## Additional Information
+
+- **BIOS/UEFI Configuration**: Ensure your system's BIOS or UEFI settings support booting from virtual hard disks if necessary.
+- **Troubleshooting**: If the boot entry does not work as expected, try reviewing the output from the `bcdedit` command to confirm the entry is correct.

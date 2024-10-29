@@ -14,12 +14,20 @@ export default defineConfig({
 			},
 			sidebar: [
 				{
+					label: 'Introduction',
+					autogenerate: { directory: 'introduction' },
+				},
+				{
 					label: 'Cheatsheets',
 					autogenerate: { directory: 'cheatsheets' },
 				},
 				{
-					label: 'Reference',
-					autogenerate: { directory: 'reference' },
+					label: 'Guides',
+					autogenerate: { directory: 'guides' },
+				},
+				{
+					label: 'Tools & Technologies',
+					autogenerate: { directory: 'tools' },
 				},
 			],
 		}),
