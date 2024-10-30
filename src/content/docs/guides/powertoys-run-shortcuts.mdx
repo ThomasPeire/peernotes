@@ -1,0 +1,172 @@
+﻿---
+title: PowerToys Run Shortcuts Guide
+description: A guide on configuring and using shortcuts in PowerToys Run for quick access to applications and actions.
+---
+import { Aside, FileTree, Steps } from '@astrojs/starlight/components';
+
+This guide covers how to create and configure custom shortcuts for use in PowerToys Run, allowing you to quickly access applications, scripts, and more.
+
+---
+
+## 1. Define a Folder for Shortcuts
+
+To keep your shortcuts organized and accessible across devices, start by defining a dedicated folder.
+
+<FileTree>
+    - OneDrive
+        - powertoys-run
+            - scripts
+                - script1.ps1
+            - icons
+                - icon1.ico
+                - icon2.ico
+            - shortcut1
+            - shortcut2
+            - shortcut2Script1
+            - shortcut2Url
+            - ...
+</FileTree>
+
+<Aside type="tip">
+    Using a cloud service, like OneDrive, is recommended to sync shortcuts across devices.
+</Aside>
+
+---
+
+## 2. Create a Shortcut
+
+### 2.1 Manually Create a Shortcut
+
+Follow these steps to create a shortcut manually in the desired folder:
+
+<Steps>
+    1. Right-click in the folder where you want to create the shortcut.
+    2. Select **New > Shortcut**.
+    3. Enter the target path (e.g., `C:\Windows\System32\mspaint.exe`).
+    4. Enter a name for the shortcut (e.g., `Paint`).
+    5. _(Optional)_ Click **Change Icon** to select a custom icon.
+    6. Click **Finish** to save the shortcut.
+</Steps>
+
+<Aside type="tip">
+    To create a shortcut to a script, use the script path as the target and add the script execution command as an argument.
+    
+    eg. _C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -noexit -ExecutionPolicy Bypass -File C:\Users\Name\OneDrive\powertoys-run\script.ps1_
+</Aside>
+
+### 2.2 Create a Shortcut Using a Script
+
+Alternatively, use the following PowerShell script to create shortcuts quickly. This script prompts for the target path, name, and optional icon location.
+
+```powershell
+function Add-Shortcut {
+    $targetPath = Read-Host "Enter the shortcut target path"
+    if (-not $targetPath) {
+        Write-Host "Target path is mandatory."
+        return
+    }
+
+    $shortcutName = Read-Host "Enter the shortcut name"
+    if (-not $shortcutName) {
+        Write-Host "Shortcut name is mandatory."
+        return
+    }
+
+    $iconLocation = Read-Host "Enter the icon location (optional)"
+    $defaultLocation = Get-Location
+    $useDefaultLocation = Read-Host "Current location is $defaultLocation. Is this location okay for saving the shortcut? (Y/n)"
+
+    if ($useDefaultLocation -eq "Y" -or $useDefaultLocation -eq "") {
+        $shortcutLocation = $defaultLocation
+    } else {
+        $shortcutLocation = Read-Host "Enter the location to save the shortcut"
+        if (-not (Test-Path $shortcutLocation)) {
+            Write-Host "Invalid location. Using default location."
+            $shortcutLocation = $defaultLocation
+        }
+    }
+
+    $WScriptShell = New-Object -ComObject WScript.Shell
+    $shortcut = $WScriptShell.CreateShortcut("$shortcutLocation\$shortcutName.lnk")
+    $shortcut.TargetPath = $targetPath
+
+    if ($iconLocation) {
+        $shortcut.IconLocation = $iconLocation
+    }
+
+    $shortcut.Save()
+    Write-Host "Shortcut created at $shortcutLocation\$shortcutName.lnk"
+}
+
+do {
+    Add-Shortcut
+    $createAnother = Read-Host "Do you want to create another shortcut? (Y/n)"
+} while ($createAnother -eq "Y" -or $createAnother -eq "")
+```
+
+<Aside type="tip">
+    Store this script as a `.ps1` file and create a shortcut to it. This allows you to access it quickly through PowerToys Run.
+</Aside>
+
+---
+
+## 3. Configure PowerToys Run to Access Shortcuts
+
+To make your shortcuts accessible in PowerToys Run, you need to add the shortcut folder to the PowerToys configuration.
+
+<Steps>
+    1. Locate the `ProgramPluginSettings.json` file in the PowerToys installation folder.
+        
+        This is typically found at
+        `%HOMEDRIVE%%HOMEPATH%\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json`.
+    2. Open the file and add the folder path to the `ProgramSources` array, as shown below:
+        ```json
+        {
+            "Location": "{pathToShortcuts}",
+            "Name": "PowerToys Links",
+            "Enabled": true,
+            "UniqueIdentifier": "{uniqueGUID}"
+        }
+        ```
+        End result should look something like this
+        ```json
+        {
+            "LastIndexTime": "2022-12-23T00:00:00+01:00",
+            "ProgramSources": [
+                {
+                    "Location": "C:\\...\\OneDrive\\powertoys-run",
+                    "Name": "Powertoys links",
+                    "Enabled": true,
+                    "UniqueIdentifier": "94a47c69-cea3-4097-9a61-a4f8875c4210"
+                }
+            ],
+            "DisabledProgramSources": [],
+            "ProgramSuffixes": [
+                "bat",
+                "appref-ms",
+                "exe",
+                "lnk",
+                "url"
+            ],
+            "RunCommandSuffixes": [
+                "bat",
+                "appref-ms",
+                "exe",
+                "lnk",
+                "url",
+                "cpl",
+                "msc"
+            ],
+            "EnableStartMenuSource": true,
+            "EnableDesktopSource": true,
+            "EnableRegistrySource": true,
+            "EnablePathEnvironmentVariableSource": true,
+            "MinScoreThreshold": 0.75
+        }
+        ```
+    3. Restart PowerToys for the changes to take effect.
+</Steps>
+
+---
+
+With these steps, your custom shortcuts will now be available through PowerToys Run, allowing you to launch applications and scripts quickly and efficiently.
