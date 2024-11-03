@@ -1,0 +1,51 @@
+﻿---
+title: Setting Up SSH Access using ssh-import-id
+description: Guide to creating an SSH key and configuring access to a GitHub repository and a Linux machine.
+---
+import { Steps } from '@astrojs/starlight/components';
+
+In this guide, we'll be walking you through the process of setting up SSH access using `ssh-import-id`.
+## Prerequisites
+
+Before you begin, ensure you have the following:
+
+- Access to the machine where you will generate the SSH key.
+- A GitHub account.
+- Access to the target Linux machine.
+
+## Generating a New SSH Key Pair
+
+On the connecting machine, generate a new SSH key pair using the following command:
+
+```bash
+ssh-keygen -t rsa -b 4096
+```
+
+The generated key can be found in the default location:
+
+- **Windows**: `%UserProfile%/.ssh/id_rsa.pub`
+- **Linux/Mac**: `~/.ssh/id_rsa.pub`
+
+## Adding the Public Key to GitHub
+
+<Steps>
+    1. Copy the public key to the clipboard.
+    2. Go to your GitHub settings page and navigate to the **SSH and GPG keys** section.
+    3. Click **New SSH Key** and paste the copied key in the **Key** field.
+</Steps>
+
+## Importing the Key on the Target Linux Machine
+
+<Steps>
+    1. If you don't have the `ssh-import-id` package installed, install it using the following command:
+
+        ```bash
+        apt install ssh-import-id
+        ```
+
+    2. Import the public key from GitHub using the following command, replacing `<username>` with your GitHub username:
+
+        ```bash
+        ssh-import-id gh:<username>
+            ```
+</Steps>
