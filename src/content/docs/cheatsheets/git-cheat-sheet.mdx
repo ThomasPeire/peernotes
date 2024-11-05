@@ -1,6 +1,9 @@
 ---
 title: Git cheat sheet
 description: Some useful Git commands and tips to help you work more efficiently with Git.
+pubDate: 2024-11-01
+author: 'Thomas Peire'
+tags: ["git", "cheatsheet", "documentation"]
 ---
 
 ## Initialization
@@ -110,6 +113,29 @@ git branch --list
 
 # Delete a branch
 git branch -D <branch-name>
+```
+
+## Finding commit that introduced a bug
+Use `git bisect` to find the commit that introduced a bug
+```bash
+# Start bisecting
+git bisect start
+
+# mark the current commit as bad
+git bisect bad
+
+# mark a specific commit as good
+git bisect good <commitSHA>
+
+# After marking bad and good commits, git will checkout a commit in the middle of the range
+# Test the commit to see if it's good or bad
+# Mark it as good or bad
+git bisect good/bad
+
+# Repeat the process until the commit that introduced the bug is found
+# Finish bisecting and return to the original branch
+git bisect reset
+
 ```
 
 ## Pushing local repo to GitHub
