@@ -13,6 +13,21 @@ tags: ["git", "cheatsheet", "documentation"]
 git init
 ```
 
+### Configure user
+```bash
+# see current configuration
+git config --global --list
+# set user name and email
+git config --global user.name "Marina Decruyden"
+git config --global user.email "Marina.Decruyden@email.com"
+
+# same commands without --global flag to set user name and email for a specific repository
+git config --list
+
+git config user.name "Dries Schellenespe"
+git config user.email "Dries.Schellenespe@email.com"
+```
+
 ### Check status
 ```bash
 git status
