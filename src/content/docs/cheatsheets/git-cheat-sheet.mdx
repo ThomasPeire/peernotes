@@ -199,6 +199,16 @@ git pull
 git reflog
 ```
 
+## Search for a commit
+
+```bash
+# search for a commit by hash or message
+git log --oneline | grep <commit hash or part of message>
+
+# Check if a commit is included in history up until a specific tag
+git log <tag> | grep <commit hash or part of message>
+```
+
 ## Clone a repository
 
 ```bash
