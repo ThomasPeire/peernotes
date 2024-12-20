@@ -1,0 +1,106 @@
+﻿---
+title: Dev Tunnels - Expose Local Services
+description: Comprehensive guide on setting up and utilizing dev tunnels to expose local services to the internet.
+pubDate: 2024-12-20
+author: 'Thomas Peire'
+tags: ["devtunnel", "development", "documentation"]
+---
+import { Steps, LinkButton } from '@astrojs/starlight/components';
+
+In this guide, we’ll walk you through the process of setting up and using dev tunnels to expose your local services to the internet.
+
+## Prerequisites
+
+Ensure the Dev Tunnel CLI tool is installed before proceeding.
+
+<Steps>
+1. **Install the Dev Tunnel CLI tool**
+    ```powershell
+    # using winget
+    winget install Microsoft.devtunnel
+    ```
+    To upgrade, use the upgrade command
+    ```powershell
+    winget upgrade Microsoft.devtunnel
+    ```
+2. **Log in using your Microsoft or GitHub account**
+    ```powershell
+    devtunnel user login
+    ```
+</Steps>
+
+## One-Time Use Tunnel
+
+### Exposing a Local Service
+
+To expose a local service to the internet for one-time use, execute the following command:
+
+```powershell
+# Example: exposing port 8080
+devtunnel host -p 8080
+```
+
+Upon execution, you’ll receive feedback in the terminal with the public URL of your service:
+
+```powershell
+# Example output
+Hosting port: 8080
+Connect via browser: https://shm5qgjz.euw.devtunnels.ms:8080, https://shm5qgjz-8080.euw.devtunnels.ms
+Inspect network activity: https://shm5qgjz-8080-inspect.euw.devtunnels.ms
+
+Ready to accept connections for tunnel: happy-cat-p2dcg82
+```
+
+### Allow Anonymous Access
+
+By default, tunnels require authentication. To permit anonymous access, use the `--anonymous` or `-a` flag:
+
+```powershell
+# Example: exposing port 8080 with anonymous access
+devtunnel host -p 8080 -a
+```
+
+To add temporary anonymous access to an existing tunnel:
+
+```powershell
+# Example: granting anonymous access for 6 hours
+devtunnel access create happy-cat-p2dcg82 -a --expiration 6h
+```
+
+To stop the tunnel, press `Ctrl+C` in the terminal.
+
+## Persistent Tunnel
+
+### Creating a Persistent Tunnel
+
+You can create a dev tunnel without hosting it immediately. The tunnel retains its public URL, even if the service is restarted. Set a custom expiration time with the `--expiration` or `-e` flag (minimum: 1 hour, default/maximum: 30 days).
+
+```powershell
+# Example: creating a persistent tunnel with a 20-day expiration
+devtunnel create peertunnel --expiration 20d
+```
+
+### Assigning a Port to the Tunnel
+
+Assign a port to the persistent tunnel using the `port create` command:
+
+```powershell
+# Example: assigning port 8080 to the tunnel
+devtunnel port create peertunnel -p 8080
+```
+
+### Allow Anonymous Access
+
+Grant temporary anonymous access to a specific port in the tunnel:
+
+```powershell
+# Example: granting anonymous access for 6 hours
+devtunnel access create peertunnel -a --expiration 6h
+```
+
+---
+
+## Official documentation
+For additional details and advanced usage, consult the official Dev Tunnel documentation.
+
+<LinkButton href="https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/cli-commands">Official documentation</LinkButton>
