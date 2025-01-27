@@ -62,6 +62,7 @@ Alternatively, use the following PowerShell script to create shortcuts quickly. 
 ```powershell
 function Add-Shortcut {
     $targetPath = Read-Host "Enter the shortcut target path"
+    $targetPath = $targetPath.Trim('"')
     if (-not $targetPath) {
         Write-Host "Target path is mandatory."
         return
@@ -74,6 +75,8 @@ function Add-Shortcut {
     }
 
     $iconLocation = Read-Host "Enter the icon location (optional)"
+    $iconLocation = $iconLocation.Trim('"')
+
     $defaultLocation = Get-Location
     $useDefaultLocation = Read-Host "Current location is $defaultLocation. Is this location okay for saving the shortcut? (Y/n)"
 
@@ -85,9 +88,11 @@ function Add-Shortcut {
             Write-Host "Invalid location. Using default location."
             $shortcutLocation = $defaultLocation
         }
+        $shortcutLocation = $shortcutLocation.Trim('"')
     }
 
     $WScriptShell = New-Object -ComObject WScript.Shell
+
     $shortcut = $WScriptShell.CreateShortcut("$shortcutLocation\$shortcutName.lnk")
     $shortcut.TargetPath = $targetPath
 
@@ -96,12 +101,16 @@ function Add-Shortcut {
     }
 
     $shortcut.Save()
+
     Write-Host "Shortcut created at $shortcutLocation\$shortcutName.lnk"
 }
 
 do {
+    Write-Host "Shortcut Creator"
+    Write-Host "================"
     Add-Shortcut
     $createAnother = Read-Host "Do you want to create another shortcut? (Y/n)"
+    Write-Host ""
 } while ($createAnother -eq "Y" -or $createAnother -eq "")
 ```
 
