@@ -1,0 +1,51 @@
+﻿---
+title: Setting Up a High Availability Proxmox Cluster
+description: Complete guide for creating a 3-node high availability Proxmox cluster with Ceph storage for reliable virtualization.
+pubDate: 2025-06-26
+author: 'Thomas Peire'
+tags: ["proxmox", "ceph", "cluster", "virtualization", "high-availability"]
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
+
+# High Availability Proxmox Cluster Setup
+
+This guide walks you through setting up a high availability Proxmox cluster using three nodes with Ceph storage, providing resilient virtualization infrastructure for your lab or production environment.
+
+## Hardware Requirements
+
+<Aside type="note">
+  This guide uses specific hardware, but the instructions can be adapted for similar components with adequate specifications.
+</Aside>
+
+For each of the 3 cluster nodes:
+- **Mini PC**: GMKtec G3 Plus
+- **Memory**: Corsair Vengeance SODIMM 32 GB (1 x 32 GB) DDR4 3200
+- **System Drive**: Transcend MTS420 120GB M.2 SSD
+- **Storage Drive**: LEXAR SSD M.2 2TB PCIe Gen 4X4 NM790 NVMe
+
+## Initial Preparation
+
+<Steps>
+1. **Configure BIOS settings**
+   - Ensure "SATA Operation" is set to "AHCI"
+   - Enable virtualization features (VT-x/AMD-V)
+
+2. **Create bootable Proxmox installation media**
+   - Download the Proxmox VE ISO from [proxmox.com/downloads](https://www.proxmox.com/en/downloads)
+   - Create a bootable USB drive using Rufus or Etcher
+
+3. **Install Proxmox on each node**
+   - Boot from the USB drive
+   - In the installation wizard:
+     - Select the system disk (Transcend MTS420 120GB M.2 SSD)
+     - Configure unique hostnames (e.g., pve1.peerlab.local, pve2.peerlab.local, pve3.peerlab.local)
+     - Configure appropriate network settings
+     - Set a strong password for the root user
+   - Complete the installation and reboot each node
+</Steps>
+
+## Next Steps
+
+TBC
