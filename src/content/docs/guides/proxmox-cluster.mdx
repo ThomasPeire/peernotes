@@ -46,6 +46,32 @@ For each of the 3 cluster nodes:
    - Complete the installation and reboot each node
 </Steps>
 
-## Next Steps
+<Aside type="caution">
+  I experienced issues while booting with both HDMI and Ethernet plugged in, resulting in no HDMI output.
+  The fix was to unplug the Ethernet cable during boot and reconnect it after the installation completed.
+  After logging in, update the system and reboot:
+    ```bash
+    apt update && apt upgrade -y
+    reboot
+    ```
+</Aside>
 
-TBC
+## Post-Installation Configuration
+
+<Steps>
+1. **Access Proxmox Web Interface**
+   - Open a web browser and navigate to `https://<node-ip>:8006`
+   - Log in with the root user and password set during installation
+
+2. **Configure Repositories**
+   - Disable the enterprise repository, as it requires a subscription
+   - Go to `Updates` > `Repositories` and disable the enterprise repository
+   - Add the no-subscription repository
+3. **Update Proxmox**
+    ```bash
+    apt update && apt upgrade -y
+    reboot
+    ```
+</Steps>
+
+
