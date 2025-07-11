@@ -1,17 +1,17 @@
 ﻿---
-title: Setting Up a High Availability Proxmox Cluster
-description: Complete guide for creating a 3-node high availability Proxmox cluster with Ceph storage for reliable virtualization.
+title: Setting Up a Proxmox Cluster
+description: Complete guide for creating a 3-node Proxmox cluster.
 pubDate: 2025-06-26
 author: 'Thomas Peire'
-tags: ["proxmox", "ceph", "cluster", "virtualization", "high-availability"]
+tags: ["proxmox", "cluster", "virtualization"]
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import { Steps } from '@astrojs/starlight/components';
+import {Aside} from '@astrojs/starlight/components';
+import {Steps} from '@astrojs/starlight/components';
 
-# High Availability Proxmox Cluster Setup
+# Proxmox Cluster Setup
 
-This guide walks you through setting up a high availability Proxmox cluster using three nodes with Ceph storage, providing resilient virtualization infrastructure for your lab or production environment.
+This guide walks you through setting up a Proxmox cluster using three nodes, providing virtualization infrastructure for your homelab.
 
 ## Hardware Requirements
 
@@ -60,7 +60,7 @@ For each of the 3 cluster nodes:
 
 <Steps>
 1. **Access Proxmox Web Interface**
-   - Open a web browser and navigate to `https://<node-ip>:8006`
+   - Open a web browser and navigate to `https://{node-ip}:8006`
    - Log in with the root user and password set during installation
 
 2. **Configure Repositories**
@@ -70,8 +70,78 @@ For each of the 3 cluster nodes:
 3. **Update Proxmox**
     ```bash
     apt update && apt upgrade -y
-    reboot
     ```
+4. **Add PCI passthrough**
+    To pass through devices from the host to the VM, you need to enable IOMMU in the BIOS and configure it in Proxmox.
+    ```bash
+    nano /etc/default/grub
+    ```
+    - For Intel CPUs, add `intel_iommu=on` to the `GRUB_CMDLINE_LINUX_DEFAULT` line.
+    - For AMD CPUs, add `amd_iommu=on`.
+    you should have a line like this:
+    ```bash
+    GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on"
+    ```
+    - Update the GRUB configuration:
+    ```bash
+    update-grub
+    ```
+    next, add modules to the `/etc/modules` file:
+    ```bash
+    nano /etc/modules
+    ```
+    - Add the following lines:
+    ```
+    # Modules required for PCI passthrough
+    vfio
+    vfio_iommu_type1
+    vfio_pci
+    vfio_virqfd
+    ```
+    - reboot
+5. ** Add NFS share for backups**
+    - Datacenter > Storage > Add > NFS
+    Id: backups
+    Server: ip of your NFS server
+    Export: nfs share path
+    Content: backup
+
+6. **Schedule backups**
+    - Datacenter > Backup > Add
+    - Select the storage (e.g., backups)
+    - Set the schedule (e.g., daily at 2 AM)
+    - Select the backup mode (e.g., snapshot)
+    - Select the VMs to back up
 </Steps>
 
+## Cluster Setup
 
+<Steps>
+1. **Create the Cluster on the First Node**
+    - Log in to the Proxmox web interface of the first node (e.g., pve1.peerlab.local)
+    - Go to `Datacenter` > `Cluster`
+    - Click `Create Cluster`
+    - Enter a cluster name (e.g., `peerlab-cluster`)
+    - Click `Create`
+
+2. **Join Additional Nodes to the Cluster**
+    - On each additional node (e.g., pve2.peerlab.local, pve3.peerlab.local):
+    - Log in to the Proxmox web interface
+    - Go to `Datacenter` > `Cluster`
+    - Click `Join Cluster`
+    - Enter the IP address of the first node and the cluster join token
+    - Click `Join`
+
+3. **Verify Cluster Status**
+    - On any node, go to `Datacenter` > `Cluster`
+    - Ensure all nodes are listed and show status as "Online"
+</Steps>
+
+<Aside type="tip">
+    Consider enabling High Availability (HA) with shared storage solutions such as NFS or Ceph to minimize downtime. I personally will use Longhorn on Kubernetes to provide HA for container workloads.
+</Aside>
+
+
+<Aside type="note">
+    If you have feedback or suggestions, feel free to contribute to the PeerNotes project.
+</Aside>

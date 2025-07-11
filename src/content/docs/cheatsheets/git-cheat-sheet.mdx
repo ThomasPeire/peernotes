@@ -62,7 +62,7 @@ git commit --amend --no-edit
 git reset HEAD~1
 
 # Revert changes from a specific commit with a new commit
-git revert <commitSHA>
+git revert COMMIT-SHA
 ```
 
 ## Viewing history
@@ -115,19 +115,19 @@ git stash apply
 
 ```bash
 # Create and switch to a new branch
-git checkout -b <branch-name>
+git checkout -b BRANCH-NAME
 
 # Switch to an existing branch
 git checkout main
 
 # Merge another branch into the current branch
-git merge <branch-name>
+git merge BRANCH-NAME
 
 # List all branches
 git branch --list
 
 # Delete a branch
-git branch -D <branch-name>
+git branch -D BRANCH-NAME
 ```
 
 ## Finding commit that introduced a bug
@@ -140,7 +140,7 @@ git bisect start
 git bisect bad
 
 # mark a specific commit as good
-git bisect good <commitSHA>
+git bisect good COMMIT-SHA
 
 # After marking bad and good commits, git will checkout a commit in the middle of the range
 # Test the commit to see if it's good or bad
@@ -162,7 +162,7 @@ git bisect reset
 ```bash
 # Set up the main branch
 git checkout main
-git remote add origin https://github.com/<user>/<repo>.git
+git remote add origin https://github.com/USER/REPO.git
 git branch -M main
 git push -u origin main
 
@@ -206,13 +206,13 @@ git reflog
 git log --oneline | grep <commit hash or part of message>
 
 # Check if a commit is included in history up until a specific tag
-git log <tag> | grep <commit hash or part of message>
+git log TAG | grep COMMIT-HASH-OR-MESSAGE
 ```
 
 ## Clone a repository
 
 ```bash
-git clone https://github.com/<user>/<repo>.git
+git clone https://github.com/USER/REPO.git
 ```
 
 ## Git configuration and aliases
