@@ -1,38 +1,47 @@
 ---
 title: Welcome to PeerNotes
-description: A collection of notes, guides, tips & tricks and more.
+description: My personal tech knowledge hub - documenting real-world solutions and practical insights from hands-on experience.
 pubDate: 2024-11-01
 author: 'Thomas Peire'
-tags: ["astro", "blogging", "learning in public"]
+tags: ["peernotes", "documentation", "tech", "guides"]
 template: splash
 hero:
-  tagline: A collection of notes, guides, tips & tricks and more!
+  tagline: My personal tech knowledge hub - real solutions from real experience
   image:
     file: ../../assets/peer-mirror.png
   actions:
-    - text: Go to notes
+    - text: Start Exploring
       link: /peernotes/introduction/intro/
       icon: right-arrow
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
 ## What you'll find here
 
+**PeerNotes** is a living knowledge base built from real-world tech experiences. Every guide, note, and reference represents actual implementations and problems solved in production environments.
+
 <CardGrid stagger>
-    <Card title="Cheatsheet" icon="document">
-        Quick references for commonly used commands, configurations, and shortcuts.
+    <Card title="Quick References" icon="document">
+        **Cheat Sheets** for daily workflows - Git commands, shortcuts, and configuration snippets that save precious time.
     </Card>
-    <Card title="Step-by-Step Guides" icon="open-book">
-        Clear instructions to walk through processes from start to finish.
+    <Card title="Comprehensive Guides" icon="open-book">
+        **Step-by-step tutorials** for complex setups like Kubernetes clusters, Proxmox configurations, and development environments.
     </Card>
-    <Card title="Troubleshooting Tips" icon="magnifier">
-        Helpful tips for resolving common and uncommon technical issues.
+    <Card title="Problem Solutions" icon="warning">
+        **Troubleshooting guides** for those tricky issues that took hours to solve - documented so you don't have to struggle again.
     </Card>
-    <Card title="Tools & Technologies" icon="puzzle">
-        Summary of useful tools and technologies.
+    <Card title="Curated Tools" icon="puzzle">
+        **Handpicked utilities** and scripts that have proven their worth in real projects and daily workflows.
     </Card>
 </CardGrid>
 
+<Aside type="note">
+    If you have feedback or suggestions, feel free to contribute to the PeerNotes project.
+</Aside>
 
+
+<Aside type="note" title="🤖 AI Enhancement Disclaimer">
+While the technical content, procedures, and solutions documented here are based entirely on my personal hands-on experience, some documentation has been enhanced using AI assistance for improved layout, structure, and semantic clarity. The core knowledge, steps, and technical details remain authentic to my actual implementations and discoveries – AI has only helped make the presentation clearer and more readable.
+</Aside>
 
