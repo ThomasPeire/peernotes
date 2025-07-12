@@ -84,16 +84,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Guides',
-					items: [
-						'guides/bootable-vhdx',
-						'guides/devtunnels',
-						'guides/install-kubernetes-on-wsl',
-						'guides/powertoys-run-shortcuts',
-						'guides/proxmox-cluster',
-						'guides/proxmox-ubuntu-vm-template',
-						'guides/setting-up-ssh-using-ssh-import-id',
-						'guides/setup-ha-k3s',
-					],
+					autogenerate: { directory: 'guides' },
 				},
 				{
 					label: 'Tools & Technologies',

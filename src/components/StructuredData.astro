@@ -1,16 +1,19 @@
 ---
 import type { Props } from '@astrojs/starlight/props';
 
-const { entry, lang } = Astro.props;
+const { entry } = Astro.props;
+
+// Type assertion to access custom frontmatter fields
+const entryData = entry.data as any;
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "TechArticle",
-  "headline": entry.data.title,
-  "description": entry.data.description,
+  "headline": entryData.title,
+  "description": entryData.description,
   "author": {
     "@type": "Person",
-    "name": entry.data.author || "Thomas Peire",
+    "name": entryData.author || "Thomas Peire",
     "url": "https://github.com/thomaspeire"
   },
   "publisher": {
@@ -18,9 +21,9 @@ const jsonLd = {
     "name": "PeerNotes",
     "url": "https://thomaspeire.github.io/peernotes/"
   },
-  "datePublished": entry.data.pubDate?.toISOString(),
-  "dateModified": entry.data.pubDate?.toISOString(),
-  "keywords": entry.data.tags?.join(", "),
+  "datePublished": entryData.pubDate?.toISOString?.() || entryData.pubDate,
+  "dateModified": entryData.pubDate?.toISOString?.() || entryData.pubDate,
+  "keywords": entryData.tags?.join?.(", ") || "",
   "url": `https://thomaspeire.github.io/peernotes/${entry.slug}/`,
   "mainEntityOfPage": {
     "@type": "WebPage",
@@ -34,4 +37,4 @@ const jsonLd = {
 };
 ---
 
-<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+<script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
