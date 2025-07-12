@@ -53,7 +53,7 @@ Each piece of documentation has been tested and used in real scenarios – nothi
 
 ## 🌐 Live Documentation
 
-The full documentation site is available at: **[https://thomaspeire.github.io/peernotes](https://thomaspeire.github.io/peernotes/)**
+The full documentation site is available at: **[https://docs.thomaspeire.be](https://docs.thomaspeire.be)**
 
 ## 💡 Documentation Philosophy
 

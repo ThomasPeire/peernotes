@@ -19,15 +19,15 @@ const jsonLd = {
   "publisher": {
     "@type": "Organization",
     "name": "PeerNotes",
-    "url": "https://thomaspeire.github.io/peernotes/"
+    "url": "https://docs.thomaspeire.be/"
   },
   "datePublished": entryData.pubDate?.toISOString?.() || entryData.pubDate,
   "dateModified": entryData.pubDate?.toISOString?.() || entryData.pubDate,
   "keywords": entryData.tags?.join?.(", ") || "",
-  "url": `https://thomaspeire.github.io/peernotes/${entry.slug}/`,
+  "url": `https://docs.thomaspeire.be/${entry.slug}/`,
   "mainEntityOfPage": {
     "@type": "WebPage",
-    "@id": `https://thomaspeire.github.io/peernotes/${entry.slug}/`
+    "@id": `https://docs.thomaspeire.be/${entry.slug}/`
   },
   "genre": "Technical Documentation",
   "about": {
