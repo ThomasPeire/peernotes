@@ -5,8 +5,7 @@ import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://thomaspeire.github.io',
-	base: '/peernotes',
+	site: 'https://docs.thomaspeire.be',
 	integrations: [
 		sitemapPlugin(),
 		starlight({
@@ -69,7 +68,7 @@ export default defineConfig({
 					tag: 'link',
 					attrs: {
 						rel: 'canonical',
-						href: 'https://thomaspeire.github.io/peernotes/',
+						href: 'https://docs.thomaspeire.be/',
 					},
 				},
 			],
