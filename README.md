@@ -1,8 +1,9 @@
-# 📚 PeerNotes
+# 📚 PeerNotes - Personal Tech Knowledge Hub
 
-> _A living knowledge base for tech exploration and discovery_
+> _A living knowledge base for personal tech exploration and discovery_
 
-Welcome to **PeerNotes** – my personal documentation site built with [Astro](https://astro.build) and [Starlight](https://starlight.astro.build). This is where I document my tech journey, capture solutions to problems I've solved, and share knowledge that might help others facing similar challenges.
+Welcome to **PeerNotes** – my personal documentation site built with [Astro](https://astro.build) and [Starlight](https://starlight.astro.build). This is where I document my tech journey, capture solutions to problems I've solved, and share knowledge that might help others facing similar challenges in **Programming**, **DevOps**, **system administration**, **Kubernetes**, and **homelab** setups.PeerNotes
+
 
 ## 🎯 What is PeerNotes?
 

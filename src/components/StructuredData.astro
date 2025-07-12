@@ -1,0 +1,37 @@
+---
+import type { Props } from '@astrojs/starlight/props';
+
+const { entry, lang } = Astro.props;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": entry.data.title,
+  "description": entry.data.description,
+  "author": {
+    "@type": "Person",
+    "name": entry.data.author || "Thomas Peire",
+    "url": "https://github.com/thomaspeire"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "PeerNotes",
+    "url": "https://thomaspeire.github.io/peernotes/"
+  },
+  "datePublished": entry.data.pubDate?.toISOString(),
+  "dateModified": entry.data.pubDate?.toISOString(),
+  "keywords": entry.data.tags?.join(", "),
+  "url": `https://thomaspeire.github.io/peernotes/${entry.slug}/`,
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": `https://thomaspeire.github.io/peernotes/${entry.slug}/`
+  },
+  "genre": "Technical Documentation",
+  "about": {
+    "@type": "Thing",
+    "name": "Technical Documentation and Tutorials"
+  }
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />

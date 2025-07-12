@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://thomaspeire.github.io/peernotes/sitemap-index.xml
+
+# Crawl-delay
+Crawl-delay: 1
