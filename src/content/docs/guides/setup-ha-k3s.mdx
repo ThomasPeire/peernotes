@@ -37,6 +37,78 @@ Our HA K3s setup consists of:
 - **HAProxy** for load balancing K3s API server traffic
 - **Floating IP** (`192.168.1.10`) to eliminate single points of failure
 
+## Network Architecture Diagram
+
+```
+                          ┌─────────────────────────────────┐
+                          │        👤 Clients              │
+                          │    kubectl, k9s, apps           │
+                          └─────────────┬───────────────────┘
+                                        │
+                          ┌─────────────▼───────────────────┐
+                          │    🌐 Floating IP (VIP)         │
+                          │       192.168.1.10:6443         │
+                          │    Managed by Keepalived        │
+                          └─────────────┬───────────────────┘
+                                        │
+                          ┌─────────────▼───────────────────┐
+                          │    ⚖️ Load Balancer            │
+                          │    HAProxy on control nodes     │
+                          └─────────┬───┬───┬───────────────┘
+                                    │   │   │
+              ┌─────────────────────┘   │   └─────────────────────┐
+              │                         │                         │
+              ▼                         ▼                         ▼
+┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐
+│   🏢 Proxmox Node 1     │ │   🏢 Proxmox Node 2    │ │   🏢 Proxmox Node 3    │
+│                         │ │                         │ │                         │
+│ ┌─────────────────────┐ │ │ ┌─────────────────────┐ │ │ ┌─────────────────────┐ │
+│ │ 🖥️ k3s-server-01    │ │ │ │ 🖥️ k3s-server-02   │ │ │ │ 🖥️ k3s-server-03    │ │
+│ │ 192.168.1.11        │ │ │ │ 192.168.1.12        │ │ │ │ 192.168.1.13        │ │
+│ │ Keepalived MASTER   │ │ │ │ Keepalived BACKUP   │ │ │ │ Keepalived BACKUP   │ │
+│ │ HAProxy instance    │ │ │ │ KHAProxy instance   │ │ │ │ HAProxy instance    │ │
+│ │ Control Plane+etcd  │ │ │ │ Control Plane+etcd  │ │ │ │ Control Plane+etcd  │ │
+│ └─────────────────────┘ │ │ └─────────────────────┘ │ │ └─────────────────────┘ │
+└─────────────────────────┘ └─────────────────────────┘ └─────────────────────────┘
+              │                         │                         │
+              └─────────────┐ ┌─────────┴─────────┐ ┌─────────────┘
+                            │ │                   │ │
+                            ▼ ▼                   ▼ ▼
+                    ┌─────────────────────────────────────┐
+                    │    🗄️ Embedded etcd Cluster         │
+                    │   Distributed across control plane  │
+                    │     (servers 01, 02, 03 only)       │
+                    └─────────────────────────────────────┘
+```
+
+### Component Details
+
+| Component | Purpose | IP Address | Port | High Availability |
+|-----------|---------|------------|------|-------------------|
+| **Floating IP** | Single entry point | `192.168.1.10` | `6443` | Managed by Keepalived |
+| **k3s-server-01** | Control plane + etcd | `192.168.1.11` | `6443` | Active member |
+| **k3s-server-02** | Control plane + etcd | `192.168.1.12` | `6443` | Active member |
+| **k3s-server-03** | Control plane + etcd | `192.168.1.13` | `6443` | Active member |
+| **k3s-worker-01** | Agent node | `192.168.1.21` | `10250` | Workload distribution |
+| **k3s-worker-02** | Agent node | `192.168.1.22` | `10250` | Workload distribution |
+| **k3s-worker-03** | Agent node | `192.168.1.23` | `10250` | Workload distribution |
+| **Keepalived** | IP failover | All control nodes | VRRP | 3-node redundancy |
+| **HAProxy** | Load balancing | All control nodes | `6443` | 3-instance redundancy |
+
+### Traffic Flow
+
+1. **Client Connection**: Clients connect to the floating IP `192.168.1.10:6443`
+2. **Keepalived**: Routes traffic to the current master node (normally k3s-server-01)
+3. **HAProxy**: Load balances incoming API requests across all three K3s control plane servers
+4. **K3s API**: Control plane processes requests and maintains cluster state via embedded etcd
+5. **Worker Communication**: Worker nodes connect to the floating IP for resilient control plane access
+6. **Workload Distribution**: Pods and services are scheduled across the worker nodes for actual workloads
+7. **Failover**: If master node fails, Keepalived automatically promotes backup node
+
+<Aside type="tip">
+  This architecture ensures no single point of failure. Even if two nodes fail simultaneously, the cluster remains operational with the remaining node.
+</Aside>
+
 ## Prerequisites
 
 - Proxmox VE environment with VM template (see [Proxmox Ubuntu VM Template Setup Guide](/guides/proxmox-ubuntu-vm-template/))
