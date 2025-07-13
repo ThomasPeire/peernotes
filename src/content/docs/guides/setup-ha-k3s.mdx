@@ -1,6 +1,6 @@
 ---
-title: 'High Availability K3s Cluster Setup - Production Ready Guide'
-description: 'Complete guide for deploying production-ready, highly available K3s clusters with embedded etcd, load balancing, and automatic failover for resilient container orchestration.'
+title: 'High Availability K3s Cluster Setup'
+description: 'Complete guide for deploying highly available K3s clusters with embedded etcd, load balancing, and automatic failover for resilient container orchestration.'
 pubDate: 2025-07-12
 author: 'Thomas Peire'
 tags:
@@ -19,8 +19,317 @@ tags:
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-This guide walks you through setting up a highly available K3s cluster using embedded etcd for true HA configuration. Perfect for production environments that need resilience and automatic failover.
+<Aside type="caution" title="Work in Progress">
+  This guide is currently under development. Instructions may be incomplete or subject to change. Please proceed with caution and verify all steps in a test environment first.
+</Aside>
 
-I choose for embedded etcd, since setting up an external database cluster will take me to far down the rabbit hole. Embedded etcd is sufficient for my homelab setup.
+This guide walks you through setting up a highly available K3s cluster using embedded etcd for true HA configuration. We'll use keepalived and HAProxy for load balancing and high availability with a floating IP address to eliminate single points of failure.
 
-THIS IS STILL WIP
+<Aside type="note">
+  This setup uses embedded etcd rather than an external database cluster. While external etcd provides more flexibility, embedded etcd is sufficient for most homelab and small production environments while being significantly easier to manage.
+</Aside>
+
+## Architecture Overview
+
+Our HA K3s setup consists of:
+- **3 control plane nodes** running K3s server with embedded etcd
+- **Keepalived** for floating IP management and failover
+- **HAProxy** for load balancing K3s API server traffic
+- **Floating IP** (`192.168.1.10`) to eliminate single points of failure
+
+## Prerequisites
+
+- Proxmox VE environment with VM template (see [Proxmox Ubuntu VM Template Setup Guide](/guides/proxmox-ubuntu-vm-template/))
+- 3 Ubuntu VMs with at least 2 CPU cores and 4GB RAM each
+- Network access between all nodes
+- Basic understanding of Kubernetes concepts
+
+## Step 1: Prepare Server VMs
+
+<Steps>
+1. **Clone VM template**
+   
+   Create 3 VMs from your Ubuntu template, ideally distributed across Proxmox nodes for hardware redundancy:
+   
+   - **VM IDs**: 301, 302, 303
+   - **Names**: `k3s-server-01`, `k3s-server-02`, `k3s-server-03`
+   - **Clone Mode**: Full clone
+   
+   <Aside type="tip">
+     If your template is on a different Proxmox node, clone locally first, then migrate the VM after creation.
+   </Aside>
+
+2. **Configure hardware resources**
+   
+   Navigate to the **Hardware** tab for each VM and adjust:
+   - **Memory**: 4096 MB (4GB)
+   - **Processors**: 2 cores
+   - **Disk**: Ensure adequate space (minimum 20GB recommended)
+
+3. **Configure network settings**
+   
+   In the **Cloud-Init** tab, set static IP addresses:
+   - **k3s-server-01**: `192.168.1.11/24`
+   - **k3s-server-02**: `192.168.1.12/24`
+   - **k3s-server-03**: `192.168.1.13/24`
+   - **Gateway**: `192.168.1.1`
+
+4. **Start and verify VMs**
+   
+   Start all VMs and verify:
+   - Correct IP addresses are assigned
+   - SSH access is working
+   - Internet connectivity is available
+   
+   ```bash
+   # Test connectivity to each node
+   ssh root@192.168.1.11
+   ssh root@192.168.1.12
+   ssh root@192.168.1.13
+   ```
+
+</Steps>
+
+## Step 2: Install and Configure Keepalived
+
+Keepalived manages our floating IP address and provides automatic failover between nodes.
+
+<Aside type="note">
+  Perform these steps on **all three VMs**. Only the configuration will differ between master and backup nodes.
+</Aside>
+
+<Steps>
+1. **Install keepalived**
+   
+   ```bash
+   sudo apt update
+   sudo apt install keepalived -y
+   ```
+
+2. **Create keepalived configuration**
+   
+   Create the configuration file:
+   
+   ```bash
+   sudo nano /etc/keepalived/keepalived.conf
+   ```
+
+3. **Configure master node** (k3s-server-01)
+   
+   ```bash
+   vrrp_instance VI_1 {
+       state MASTER
+       interface eth0
+       virtual_router_id 55
+       priority 255
+       advert_int 1
+       authentication {
+           auth_type PASS
+           auth_pass SuPeRsEcReT
+       }
+       virtual_ipaddress {
+           192.168.1.10/24
+       }
+   }
+   ```
+
+4. **Configure backup nodes** (k3s-server-02 and k3s-server-03)
+   
+   For **k3s-server-02**:
+   ```bash
+   vrrp_instance VI_1 {
+       state BACKUP
+       interface eth0
+       virtual_router_id 55
+       priority 150
+       advert_int 1
+       authentication {
+           auth_type PASS
+           auth_pass SuPeRsEcReT
+       }
+       virtual_ipaddress {
+           192.168.1.10/24
+       }
+   }
+   ```
+   
+   For **k3s-server-03**:
+   ```bash
+   vrrp_instance VI_1 {
+       state BACKUP
+       interface eth0
+       virtual_router_id 55
+       priority 100
+       advert_int 1
+       authentication {
+           auth_type PASS
+           auth_pass SuPeRsEcReT
+       }
+       virtual_ipaddress {
+           192.168.1.10/24
+       }
+   }
+   ```
+
+5. **Start and enable keepalived**
+   
+   On all nodes:
+   ```bash
+   sudo systemctl enable --now keepalived.service
+   sudo systemctl status keepalived.service
+   ```
+
+6. **Test failover functionality**
+   
+   ```bash
+   # Test basic connectivity to individual nodes
+   ping -c 3 192.168.1.11
+   ping -c 3 192.168.1.12
+   ping -c 3 192.168.1.13
+   
+   # Test floating IP
+   ping -c 3 192.168.1.10
+   ```
+   
+   Test failover by stopping keepalived on the master:
+   ```bash
+   # On k3s-server-01 (master)
+   sudo systemctl stop keepalived.service
+   
+   # The floating IP should still respond
+   ping -c 3 192.168.1.10
+   
+   # Check which node took over
+   sudo systemctl status keepalived.service
+   
+   # Restart the service
+   sudo systemctl start keepalived.service
+   ```
+
+</Steps>
+
+
+## Step 3: Install and Configure HAProxy
+
+HAProxy will load balance the K3s API server traffic across all three nodes.
+
+<Aside type="note">
+  Install HAProxy on **all three VMs** to ensure the load balancer is also highly available.
+</Aside>
+
+<Steps>
+1. **Install HAProxy**
+   
+   ```bash
+   sudo apt update
+   sudo apt install haproxy -y
+   ```
+
+2. **Configure HAProxy**
+   
+   Edit the HAProxy configuration:
+   
+   ```bash
+   sudo nano /etc/haproxy/haproxy.cfg
+   ```
+   
+   Add the following configuration at the end of the file:
+   
+   ```bash
+   # K3s API Server Load Balancer
+   frontend k3s_frontend
+           bind *:6443
+           mode tcp
+           default_backend k3s_backend
+   
+   backend k3s_backend
+           mode tcp
+           option tcp-check
+           balance roundrobin
+           
+           server k3s-server-01 192.168.1.11:6443 check
+           server k3s-server-02 192.168.1.12:6443 check
+           server k3s-server-03 192.168.1.13:6443 check
+   ```
+
+3. **Restart and enable HAProxy**
+   
+   ```bash
+   sudo systemctl restart haproxy
+   sudo systemctl enable haproxy
+   sudo systemctl status haproxy
+   ```
+
+4. **Verify HAProxy configuration**
+   
+   Check for configuration errors:
+   ```bash
+   sudo haproxy -f /etc/haproxy/haproxy.cfg -c
+   ```
+
+</Steps>
+
+## Step 4: Install K3s Cluster
+
+Now we'll install K3s with embedded etcd to create our highly available cluster.
+
+<Aside type="caution">
+  The following steps are currently being refined. Ensure you have backups.
+</Aside>
+
+<Steps>
+1. **Initialize the first control plane node**
+   
+   On **k3s-server-01**, run:
+   
+   ```bash
+   curl -sfL https://get.k3s.io | K3S_TOKEN=SECRET sh -s - server \
+     --bind-address=127.0.0.1 \
+     --cluster-init \
+     --tls-san=192.168.1.10
+   ```
+   
+   <Aside type="tip">
+     Replace `SECRET` with a secure token of your choice. This token will be used by other nodes to join the cluster.
+   </Aside>
+
+2. **Wait for first node to be ready**
+   
+   Verify the first node is running:
+   ```bash
+   sudo systemctl status k3s
+   sudo kubectl get nodes
+   ```
+
+3. **Join additional control plane nodes**
+   
+   On **k3s-server-02** and **k3s-server-03**, run:
+   
+   ```bash
+   curl -sfL https://get.k3s.io | K3S_TOKEN=SECRET sh -s - server \
+     --server https://192.168.1.11:6443 \
+     --bind-address=127.0.0.1 \
+     --tls-san=192.168.1.10
+   ```
+   
+   <Aside type="note">
+     For k3s-server-03, update the `--tls-san` parameters to use `192.168.1.13` and `k3s-server-03`.
+   </Aside>
+
+4. **Verify cluster status**
+   
+   Check that all nodes have joined:
+   ```bash
+   sudo kubectl get nodes -o wide
+   sudo kubectl get pods -A
+   ```
+
+</Steps>
+
+## Next Steps (Coming Soon)
+
+<Aside type="note">
+  The following sections are planned for completion:
+  - Agent node installation and configuration
+</Aside>
+
