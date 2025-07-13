@@ -20,18 +20,24 @@ tags:
 import { Steps, Aside } from '@astrojs/starlight/components';
 
 <Aside type="caution" title="Work in Progress">
-  This guide is currently under development. Instructions may be incomplete or subject to change. Please proceed with caution and verify all steps in a test environment first.
+  This guide is currently under development. Instructions may be incomplete or
+  subject to change. Please proceed with caution and verify all steps in a test
+  environment first.
 </Aside>
 
 This guide walks you through setting up a highly available K3s cluster using embedded etcd for true HA configuration. We'll use keepalived and HAProxy for load balancing and high availability with a floating IP address to eliminate single points of failure.
 
 <Aside type="note">
-  This setup uses embedded etcd rather than an external database cluster. While external etcd provides more flexibility, embedded etcd is sufficient for most homelab and small production environments while being significantly easier to manage.
+  This setup uses embedded etcd rather than an external database cluster. While
+  external etcd provides more flexibility, embedded etcd is sufficient for most
+  homelab and small production environments while being significantly easier to
+  manage.
 </Aside>
 
 ## Architecture Overview
 
 Our HA K3s setup consists of:
+
 - **3 control plane nodes** running K3s server with embedded etcd
 - **Keepalived** for floating IP management and failover
 - **HAProxy** for load balancing K3s API server traffic
@@ -83,17 +89,17 @@ Our HA K3s setup consists of:
 
 ### Component Details
 
-| Component | Purpose | IP Address | Port | High Availability |
-|-----------|---------|------------|------|-------------------|
-| **Floating IP** | Single entry point | `192.168.1.10` | `6443` | Managed by Keepalived |
-| **k3s-server-01** | Control plane + etcd | `192.168.1.11` | `6443` | Active member |
-| **k3s-server-02** | Control plane + etcd | `192.168.1.12` | `6443` | Active member |
-| **k3s-server-03** | Control plane + etcd | `192.168.1.13` | `6443` | Active member |
-| **k3s-worker-01** | Agent node | `192.168.1.21` | `10250` | Workload distribution |
-| **k3s-worker-02** | Agent node | `192.168.1.22` | `10250` | Workload distribution |
-| **k3s-worker-03** | Agent node | `192.168.1.23` | `10250` | Workload distribution |
-| **Keepalived** | IP failover | All control nodes | VRRP | 3-node redundancy |
-| **HAProxy** | Load balancing | All control nodes | `6443` | 3-instance redundancy |
+| Component         | Purpose              | IP Address        | Port    | High Availability     |
+| ----------------- | -------------------- | ----------------- | ------- | --------------------- |
+| **Floating IP**   | Single entry point   | `192.168.1.10`    | `6443`  | Managed by Keepalived |
+| **k3s-server-01** | Control plane + etcd | `192.168.1.11`    | `6443`  | Active member         |
+| **k3s-server-02** | Control plane + etcd | `192.168.1.12`    | `6443`  | Active member         |
+| **k3s-server-03** | Control plane + etcd | `192.168.1.13`    | `6443`  | Active member         |
+| **k3s-worker-01** | Agent node           | `192.168.1.21`    | `10250` | Workload distribution |
+| **k3s-worker-02** | Agent node           | `192.168.1.22`    | `10250` | Workload distribution |
+| **k3s-worker-03** | Agent node           | `192.168.1.23`    | `10250` | Workload distribution |
+| **Keepalived**    | IP failover          | All control nodes | VRRP    | 3-node redundancy     |
+| **HAProxy**       | Load balancing       | All control nodes | `6443`  | 3-instance redundancy |
 
 ### Traffic Flow
 
@@ -106,7 +112,8 @@ Our HA K3s setup consists of:
 7. **Failover**: If master node fails, Keepalived automatically promotes backup node
 
 <Aside type="tip">
-  This architecture ensures no single point of failure. Even if two nodes fail simultaneously, the cluster remains operational with the remaining node.
+  This architecture ensures no single point of failure. Even if two nodes fail
+  simultaneously, the cluster remains operational with the remaining node.
 </Aside>
 
 ## Prerequisites
@@ -132,27 +139,30 @@ Our HA K3s setup consists of:
    </Aside>
 
 2. **Configure hardware resources**
-   
+
    Navigate to the **Hardware** tab for each VM and adjust:
+
    - **Memory**: 4096 MB (4GB)
    - **Processors**: 2 cores
    - **Disk**: Ensure adequate space (minimum 20GB recommended)
 
 3. **Configure network settings**
-   
+
    In the **Cloud-Init** tab, set static IP addresses:
+
    - **k3s-server-01**: `192.168.1.11/24`
    - **k3s-server-02**: `192.168.1.12/24`
    - **k3s-server-03**: `192.168.1.13/24`
    - **Gateway**: `192.168.1.1`
 
 4. **Start and verify VMs**
-   
+
    Start all VMs and verify:
+
    - Correct IP addresses are assigned
    - SSH access is working
    - Internet connectivity is available
-   
+
    ```bash
    # Test connectivity to each node
    ssh root@192.168.1.11
@@ -167,7 +177,8 @@ Our HA K3s setup consists of:
 Keepalived manages our floating IP address and provides automatic failover between nodes.
 
 <Aside type="note">
-  Perform these steps on **all three VMs**. Only the configuration will differ between master and backup nodes.
+  Perform these steps on **all three VMs**. Only the configuration will differ
+  between master and backup nodes.
 </Aside>
 
 <Steps>
@@ -179,15 +190,15 @@ Keepalived manages our floating IP address and provides automatic failover betwe
    ```
 
 2. **Create keepalived configuration**
-   
+
    Create the configuration file:
-   
+
    ```bash
    sudo nano /etc/keepalived/keepalived.conf
    ```
 
 3. **Configure master node** (k3s-server-01)
-   
+
    ```bash
    vrrp_instance VI_1 {
        state MASTER
@@ -206,8 +217,9 @@ Keepalived manages our floating IP address and provides automatic failover betwe
    ```
 
 4. **Configure backup nodes** (k3s-server-02 and k3s-server-03)
-   
+
    For **k3s-server-02**:
+
    ```bash
    vrrp_instance VI_1 {
        state BACKUP
@@ -224,8 +236,9 @@ Keepalived manages our floating IP address and provides automatic failover betwe
        }
    }
    ```
-   
+
    For **k3s-server-03**:
+
    ```bash
    vrrp_instance VI_1 {
        state BACKUP
@@ -244,49 +257,51 @@ Keepalived manages our floating IP address and provides automatic failover betwe
    ```
 
 5. **Start and enable keepalived**
-   
+
    On all nodes:
+
    ```bash
    sudo systemctl enable --now keepalived.service
    sudo systemctl status keepalived.service
    ```
 
 6. **Test failover functionality**
-   
+
    ```bash
    # Test basic connectivity to individual nodes
    ping -c 3 192.168.1.11
    ping -c 3 192.168.1.12
    ping -c 3 192.168.1.13
-   
+
    # Test floating IP
    ping -c 3 192.168.1.10
    ```
-   
+
    Test failover by stopping keepalived on the master:
+
    ```bash
    # On k3s-server-01 (master)
    sudo systemctl stop keepalived.service
-   
+
    # The floating IP should still respond
    ping -c 3 192.168.1.10
-   
+
    # Check which node took over
    sudo systemctl status keepalived.service
-   
+
    # Restart the service
    sudo systemctl start keepalived.service
    ```
 
 </Steps>
 
-
 ## Step 3: Install and Configure HAProxy
 
 HAProxy will load balance the K3s API server traffic across all three nodes.
 
 <Aside type="note">
-  Install HAProxy on **all three VMs** to ensure the load balancer is also highly available.
+  Install HAProxy on **all three VMs** to ensure the load balancer is also
+  highly available.
 </Aside>
 
 <Steps>
@@ -298,34 +313,34 @@ HAProxy will load balance the K3s API server traffic across all three nodes.
    ```
 
 2. **Configure HAProxy**
-   
+
    Edit the HAProxy configuration:
-   
+
    ```bash
    sudo nano /etc/haproxy/haproxy.cfg
    ```
-   
+
    Add the following configuration at the end of the file:
-   
+
    ```bash
    # K3s API Server Load Balancer
    frontend k3s_frontend
            bind *:6443
            mode tcp
            default_backend k3s_backend
-   
+
    backend k3s_backend
            mode tcp
            option tcp-check
            balance roundrobin
-           
+
            server k3s-server-01 192.168.1.11:6443 check
            server k3s-server-02 192.168.1.12:6443 check
            server k3s-server-03 192.168.1.13:6443 check
    ```
 
 3. **Restart and enable HAProxy**
-   
+
    ```bash
    sudo systemctl restart haproxy
    sudo systemctl enable haproxy
@@ -333,8 +348,9 @@ HAProxy will load balance the K3s API server traffic across all three nodes.
    ```
 
 4. **Verify HAProxy configuration**
-   
+
    Check for configuration errors:
+
    ```bash
    sudo haproxy -f /etc/haproxy/haproxy.cfg -c
    ```
@@ -366,17 +382,18 @@ Now we'll install K3s with embedded etcd to create our highly available cluster.
    </Aside>
 
 2. **Wait for first node to be ready**
-   
+
    Verify the first node is running:
+
    ```bash
    sudo systemctl status k3s
    sudo kubectl get nodes
    ```
 
 3. **Join additional control plane nodes**
-   
+
    On **k3s-server-02** and **k3s-server-03**, run:
-   
+
    ```bash
    curl -sfL https://get.k3s.io | K3S_TOKEN=SECRET sh -s - server \
      --server https://192.168.1.11:6443 \
@@ -385,8 +402,9 @@ Now we'll install K3s with embedded etcd to create our highly available cluster.
    ```
 
 4. **Verify cluster status**
-   
+
    Check that all nodes have joined:
+
    ```bash
    sudo kubectl get nodes -o wide
    sudo kubectl get pods -A
@@ -397,7 +415,6 @@ Now we'll install K3s with embedded etcd to create our highly available cluster.
 ## Next Steps (Coming Soon)
 
 <Aside type="note">
-  The following sections are planned for completion:
-  - Agent node installation and configuration
+  The following sections are planned for completion: - Agent node installation
+  and configuration
 </Aside>
-
