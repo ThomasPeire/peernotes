@@ -72,7 +72,7 @@ Our HA K3s setup consists of:
 │ │ 🖥️ k3s-server-01    │ │ │ │ 🖥️ k3s-server-02   │ │ │ │ 🖥️ k3s-server-03    │ │
 │ │ 192.168.1.11        │ │ │ │ 192.168.1.12        │ │ │ │ 192.168.1.13        │ │
 │ │ Keepalived MASTER   │ │ │ │ Keepalived BACKUP   │ │ │ │ Keepalived BACKUP   │ │
-│ │ HAProxy instance    │ │ │ │ KHAProxy instance   │ │ │ │ HAProxy instance    │ │
+│ │ HAProxy instance    │ │ │ │ HAProxy instance    │ │ │ │ HAProxy instance    │ │
 │ │ Control Plane+etcd  │ │ │ │ Control Plane+etcd  │ │ │ │ Control Plane+etcd  │ │
 │ └─────────────────────┘ │ │ └─────────────────────┘ │ │ └─────────────────────┘ │
 └─────────────────────────┘ └─────────────────────────┘ └─────────────────────────┘
@@ -83,7 +83,7 @@ Our HA K3s setup consists of:
                     ┌─────────────────────────────────────┐
                     │    🗄️ Embedded etcd Cluster         │
                     │   Distributed across control plane  │
-                    │     (servers 01, 02, 03 only)       │
+                    │     (servers 01, 02, 03)            │
                     └─────────────────────────────────────┘
 ```
 
@@ -412,9 +412,120 @@ Now we'll install K3s with embedded etcd to create our highly available cluster.
 
 </Steps>
 
-## Next Steps (Coming Soon)
+## Step 5: Configure Agent (Worker) Nodes
+
+Worker nodes are responsible for running your actual workloads (pods, containers). They join the cluster as agent nodes and communicate with the control plane via the floating IP for high availability.
 
 <Aside type="note">
-  The following sections are planned for completion: - Agent node installation
-  and configuration
+  Worker nodes require more resources than control plane nodes since they'll be running your applications. We'll distribute them across Proxmox nodes for hardware redundancy.
 </Aside>
+
+<Steps>
+
+1. **Clone VM template for worker nodes**
+   
+   Create 3 worker VMs from the Ubuntu template, distributed across Proxmox nodes:
+   
+   - **VM IDs**: 311, 312, 313
+   - **Names**: `k3s-worker-01`, `k3s-worker-02`, `k3s-worker-03`
+   - **Clone Mode**: Full clone
+   - **Distribution**: Place one worker on each Proxmox node alongside the control plane nodes
+
+2. **Configure worker hardware resources**
+
+   Navigate to the **Hardware** tab for each worker VM and adjust:
+
+   - **Memory**: 24576 MB (24GB)
+   - **Processors**: 2 cores
+   - **Disk**: I'll keep it at 32GB for now (might change when we implement Longhorn)
+
+   <Aside type="tip">
+     Workers need more resources than control plane nodes since they run actual workloads. Adjust based on your expected application requirements.
+   </Aside>
+
+3. **Configure worker network settings**
+
+   In the **Cloud-Init** tab, set static IP addresses:
+
+   - **k3s-worker-01**: `192.168.1.21/24`
+   - **k3s-worker-02**: `192.168.1.22/24`
+   - **k3s-worker-03**: `192.168.1.23/24`
+   - **Gateway**: `192.168.1.1`
+
+4. **Start and verify worker VMs**
+
+   Start all worker VMs and verify connectivity:
+
+   ```bash
+   # Test connectivity to each worker node
+   ssh root@192.168.1.21
+   ssh root@192.168.1.22
+   ssh root@192.168.1.23
+   ```
+
+5. **Install K3s agent on worker nodes**
+
+   On each worker node (**k3s-worker-01**, **k3s-worker-02**, **k3s-worker-03**), run:
+
+   ```bash
+   curl -sfL https://get.k3s.io | K3S_TOKEN=SECRET sh -s - agent \
+     --server https://192.168.1.10:6443
+   ```
+
+   <Aside type="caution">
+     Use the same `SECRET` token that you used when setting up the control plane cluster.
+   </Aside>
+
+   <Aside type="tip">
+     Workers connect to the floating IP (`192.168.1.10`) rather than individual server IPs. This ensures high availability - if any control plane node fails, workers can still communicate with the cluster.
+   </Aside>
+
+6. **Verify cluster with worker nodes**
+
+   From any control plane node, verify all nodes have joined:
+
+   ```bash
+   # Check all nodes are ready
+   sudo kubectl get nodes -o wide
+   
+   # Should show something like:
+   # NAME             STATUS   ROLES                  AGE   VERSION
+   # k3s-server-01    Ready    control-plane,master   45m   v1.28.x+k3s1
+   # k3s-server-02    Ready    control-plane,master   40m   v1.28.x+k3s1
+   # k3s-server-03    Ready    control-plane,master   35m   v1.28.x+k3s1
+   # k3s-worker-01    Ready    <none>                 5m    v1.28.x+k3s1
+   # k3s-worker-02    Ready    <none>                 4m    v1.28.x+k3s1
+   # k3s-worker-03    Ready    <none>                 3m    v1.28.x+k3s1
+   
+   # Check cluster info
+   sudo kubectl cluster-info
+   
+   # Verify system pods are running
+   sudo kubectl get pods -A
+   ```
+
+8. **Test workload scheduling**
+
+   Deploy a test application to verify workers can run pods:
+
+   ```bash
+   # Create a test deployment
+   sudo kubectl create deployment nginx-test --image=nginx --replicas=3
+   
+   # Check pod distribution across worker nodes
+   sudo kubectl get pods -o wide
+   
+   # Clean up test deployment
+   sudo kubectl delete deployment nginx-test
+   ```
+
+</Steps>
+
+<Aside type="tip">
+  Your K3s high availability cluster is now complete! You have a resilient setup with 3 control plane nodes for cluster management and 3 worker nodes for running applications, all distributed across your Proxmox infrastructure.
+</Aside>
+
+## Next Steps
+
+- Implement Longhorn for High availability persistent storage
+
