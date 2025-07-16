@@ -41,54 +41,71 @@ Our HA K3s setup consists of:
 ## Network Architecture Diagram
 
 ```
-                          ┌─────────────────────────────┐
-                          │        👤 Clients           │
-                          │    kubectl, k9s, apps       │
-                          └─────────────┬───────────────┘
-                                        │
-                          ┌─────────────▼───────────────┐
-                          │    🌐 Floating IP (VIP)     │
-                          │       192.168.1.10:6443     │
-                          │    Managed by Keepalived    │
-                          └─────────────────────────────┘
-                                    │       │
-              ┌─────────────────────┘       └─────────────────────┐
-              │                                                   │
-              ▼                                                   ▼
+                      ┌─────────────────────────────────┐
+                      │        👤 Clients               │
+                      │    kubectl, k9s, apps           │
+                      └──────────────┬──────────────────┘
+                                     │
+                      ┌──────────────▼──────────────────┐
+                      │    🌐 Floating IP (VIP)         │
+                      │       192.168.1.10:6443         │
+                      │    Managed by Keepalived        │
+                      └──────────────┬──────────────────┘
+                                     │
+                                     ▼
     ┌─────────────────────────────────────────────────────────────────┐
     │                    🔧 Load Balancer Layer                       │
     │                                                                 │
-    │ ┌─────────────────────────┐ ┌─────────────────────────┐         │
-    │ │ 🖥️ lb-01                │ │ 🖥️ lb-02               │         │
-    │ │ 192.168.1.8             │ │ 192.168.1.9             │         │
-    │ │ Keepalived MASTER       │ │ Keepalived BACKUP       │         │
-    │ │ HAProxy instance        │ │ HAProxy instance        │         │
-    │ └─────────────────────────┘ └─────────────────────────┘         │
-    └─────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
+    │  ┌───────────────────────┐     ┌───────────────────────┐        │
+    │  │ 🖥️ lb-01              │    │ 🖥️ lb-02              │        │
+    │  │ 192.168.1.8           │     │ 192.168.1.9           │        │
+    │  │ Keepalived MASTER     │     │ Keepalived BACKUP     │        │
+    │  │ HAProxy instance      │     │ HAProxy instance      │        │
+    │  └───────────────────────┘     └───────────────────────┘        │
+    └─────────────────────────────────┬───────────────────────────────┘
+                                      │
+                                      ▼
     ┌─────────────────────────────────────────────────────────────────┐
     │                     ⚙️ K3s Control Plane                        │
     │                                                                 │
-    │ ┌─────────────────────────┐ ┌─────────────────────────┐         │
-    │ │ 🖥️ k3s-server-01        │ │ 🖥️ k3s-server-02       │         │
-    │ │ 192.168.1.11            │ │ 192.168.1.12            │         │
-    │ │ Control Plane+etcd      │ │ Control Plane+etcd      │         │
-    │ └─────────────────────────┘ └─────────────────────────┘         │
+    │  ┌───────────────────────┐     ┌───────────────────────┐        │
+    │  │ 🖥️ k3s-server-01      │    │ 🖥️ k3s-server-02      │        │
+    │  │ 192.168.1.11          │     │ 192.168.1.12          │        │
+    │  │ Control Plane+etcd    │     │ Control Plane+etcd    │        │
+    │  └───────────────────────┘     └───────────────────────┘        │
     │                                                                 │
-    │           ┌─────────────────────────┐                           │
-    │           │ 🖥️ k3s-server-03        │                           │
-    │           │ 192.168.1.13            │                           │
-    │           │ Control Plane+etcd      │                           │
-    │           └─────────────────────────┘                           │
+    │               ┌───────────────────────┐                         │
+    │               │ 🖥️ k3s-server-03      │                         │
+    │               │ 192.168.1.13          │                         │
+    │               │ Control Plane+etcd    │                         │
+    │               └───────────────────────┘                         │
+    └─────────────────────────────────┬───────────────────────────────┘
+                                      │
+                                      ▼
+                   ┌──────────────────────────────────────┐
+                   │    🗄️ Embedded etcd Cluster          │
+                   │   Distributed across control plane   │
+                   │     (servers 01, 02, 03)             │
+                   └──────────────────────────────────────┘
+                                      │
+                                      ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                     🚀 K3s Worker Nodes                         │
+    │                                                                 │
+    │  ┌───────────────────────┐ ┌───────────────────────┐            │
+    │  │ 🖥️ k3s-worker-01     │ │ 🖥️ k3s-worker-02      │            │
+    │  │ 192.168.1.21          │ │ 192.168.1.22          │            │
+    │  │ Agent node            │ │ Agent node            │            │
+    │  │ Workload execution    │ │ Workload execution    │            │
+    │  └───────────────────────┘ └───────────────────────┘            │
+    │                                                                 │
+    │               ┌───────────────────────┐                         │
+    │               │ 🖥️ k3s-worker-03      │                         │
+    │               │ 192.168.1.23          │                         │
+    │               │ Agent node            │                         │
+    │               │ Workload execution    │                         │
+    │               └───────────────────────┘                         │
     └─────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-                    ┌─────────────────────────────────────┐
-                    │    🗄️ Embedded etcd Cluster         │
-                    │   Distributed across control plane  │
-                    │     (servers 01, 02, 03)            │
-                    └─────────────────────────────────────┘
 ```
 
 ### Component Details
@@ -124,7 +141,10 @@ Our HA K3s setup consists of:
 ## Prerequisites
 
 - Proxmox VE environment with VM template (see [Proxmox Ubuntu VM Template Setup Guide](/guides/proxmox-ubuntu-vm-template/))
-- 8 Ubuntu VMs total: 2 for load balancers and 3 for K3s servers, each with at least 2 CPU cores and 4GB RAM and 3 for K3s agents, each with at least 2CPU cores and 8GB RAM.
+- 8 Ubuntu VMs total: 
+  - 2 for load balancers (2 CPU cores, 512MB RAM minimum)
+  - 3 for K3s servers (2 CPU cores, 4GB RAM minimum) 
+  - 3 for K3s agents (2 CPU cores, 8GB RAM minimum)
 - Network access between all nodes
 - Basic understanding of Kubernetes concepts
 
@@ -214,7 +234,7 @@ Our HA K3s setup consists of:
 
 </Steps>
 
-## Step 2: Install and Configure Keepalived
+## Step 3: Install and Configure Keepalived
 
 Keepalived manages our floating IP address and provides automatic failover between the dedicated load balancer nodes.
 
@@ -316,7 +336,7 @@ Keepalived manages our floating IP address and provides automatic failover betwe
 
 </Steps>
 
-## Step 3: Install and Configure HAProxy
+## Step 4: Install and Configure HAProxy
 
 HAProxy will load balance the K3s API server traffic across all three K3s server nodes.
 
@@ -372,8 +392,8 @@ HAProxy will load balance the K3s API server traffic across all three K3s server
    sudo systemctl status haproxy
    ```
 
-   <Aside type="caution">
-   attention: status will show that the k3s-servers are down, which is normal since we did not set them up yet.
+   <Aside type="note">
+     HAProxy status will show that the K3s servers are down, which is expected since we haven't set them up yet.
    </Aside>
 
 4. **Verify HAProxy configuration**
@@ -386,7 +406,7 @@ HAProxy will load balance the K3s API server traffic across all three K3s server
 
 </Steps>
 
-## Step 4: Install K3s Cluster
+## Step 5: Install K3s Cluster
 
 Now we'll install K3s with embedded etcd to create our highly available cluster.
 
@@ -435,7 +455,7 @@ Now we'll install K3s with embedded etcd to create our highly available cluster.
 
 </Steps>
 
-## Step 5: Configure Agent (Worker) Nodes
+## Step 6: Configure Agent (Worker) Nodes
 
 Worker nodes are responsible for running your actual workloads (pods, containers). They join the cluster as agent nodes and communicate with the control plane via the floating IP for high availability.
 
@@ -458,12 +478,12 @@ Worker nodes are responsible for running your actual workloads (pods, containers
 
    Navigate to the **Hardware** tab for each worker VM and adjust:
 
-   - **Memory**: 24576 MB (24GB)
-   - **Processors**: 2 cores
-   - **Disk**: I'll keep it at 32GB for now (might change when we implement Longhorn)
+   - **Memory**: 24576 MB (24GB - adjust based on your workload requirements)
+   - **Processors**: 2 cores (adjust based on your workload requirements)
+   - **Disk**: 32GB (consider more storage if using Longhorn or other persistent storage solutions)
 
    <Aside type="tip">
-     Workers need more resources than control plane nodes since they run actual workloads. Adjust based on your expected application requirements.
+     Worker nodes need more resources than control plane nodes since they run your actual workloads. Adjust memory and CPU based on your expected application requirements.
    </Aside>
 
 3. **Configure worker network settings**
@@ -500,7 +520,7 @@ Worker nodes are responsible for running your actual workloads (pods, containers
    </Aside>
 
    <Aside type="tip">
-     Workers connect to the floating IP (`192.168.1.10`) rather than individual server IPs. This ensures high availability - if any control plane node fails, workers can still communicate with the cluster.
+     Worker nodes connect to the floating IP (`192.168.1.10`) rather than individual server IPs. This ensures high availability - if any control plane node fails, workers can still communicate with the cluster.
    </Aside>
 
 6. **Verify cluster with worker nodes**
@@ -527,7 +547,7 @@ Worker nodes are responsible for running your actual workloads (pods, containers
    sudo kubectl get pods -A
    ```
 
-8. **Test workload scheduling**
+7. **Test workload scheduling**
 
    Deploy a test application to verify workers can run pods:
 
@@ -545,10 +565,12 @@ Worker nodes are responsible for running your actual workloads (pods, containers
 </Steps>
 
 <Aside type="tip">
-  Your K3s high availability cluster is now complete! You have a resilient setup with 3 control plane nodes for cluster management and 3 worker nodes for running applications, all distributed across your Proxmox infrastructure.
+  Your K3s high availability cluster is now complete! You have a resilient setup with 3 control plane nodes for cluster management, 3 worker nodes for running applications, and 2 dedicated load balancers for high availability - all distributed across your Proxmox infrastructure for maximum redundancy.
 </Aside>
 
 ## Next Steps
 
-- Implement Longhorn for High availability persistent storage
+- Configure persistent storage with Longhorn for high availability data persistence
+- Set up monitoring and logging
+- Implement backup strategies for your cluster data
 
