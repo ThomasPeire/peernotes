@@ -12,25 +12,18 @@ tags:
     'etcd',
     'load-balancing',
     'container-orchestration',
-    'homelab',
-    'production',
+    'homelab'
   ]
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
-
-<Aside type="caution" title="Work in Progress">
-  This guide is currently under development. Instructions may be incomplete or
-  subject to change. Please proceed with caution and verify all steps in a test
-  environment first.
-</Aside>
 
 This guide walks you through setting up a highly available K3s cluster using embedded etcd for true HA configuration. We'll use keepalived and HAProxy for load balancing and high availability with a floating IP address to eliminate single points of failure.
 
 <Aside type="note">
   This setup uses embedded etcd rather than an external database cluster. While
   external etcd provides more flexibility, embedded etcd is sufficient for most
-  homelab and small production environments while being significantly easier to
+  homelab environments while being significantly easier to
   manage.
 </Aside>
 
@@ -39,6 +32,8 @@ This guide walks you through setting up a highly available K3s cluster using emb
 Our HA K3s setup consists of:
 
 - **3 control plane nodes** running K3s server with embedded etcd
+- **3 worker nodes** for running workloads
+- **2 dedicated load balancer nodes** running Keepalived and HAProxy
 - **Keepalived** for floating IP management and failover
 - **HAProxy** for load balancing K3s API server traffic
 - **Floating IP** (`192.168.1.10`) to eliminate single points of failure
@@ -46,40 +41,49 @@ Our HA K3s setup consists of:
 ## Network Architecture Diagram
 
 ```
-                          ┌─────────────────────────────────┐
-                          │        👤 Clients              │
-                          │    kubectl, k9s, apps           │
-                          └─────────────┬───────────────────┘
+                          ┌─────────────────────────────┐
+                          │        👤 Clients           │
+                          │    kubectl, k9s, apps       │
+                          └─────────────┬───────────────┘
                                         │
-                          ┌─────────────▼───────────────────┐
-                          │    🌐 Floating IP (VIP)         │
-                          │       192.168.1.10:6443         │
-                          │    Managed by Keepalived        │
-                          └─────────────┬───────────────────┘
-                                        │
-                          ┌─────────────▼───────────────────┐
-                          │    ⚖️ Load Balancer            │
-                          │    HAProxy on control nodes     │
-                          └─────────┬───┬───┬───────────────┘
-                                    │   │   │
-              ┌─────────────────────┘   │   └─────────────────────┐
-              │                         │                         │
-              ▼                         ▼                         ▼
-┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐
-│   🏢 Proxmox Node 1     │ │   🏢 Proxmox Node 2    │ │   🏢 Proxmox Node 3    │
-│                         │ │                         │ │                         │
-│ ┌─────────────────────┐ │ │ ┌─────────────────────┐ │ │ ┌─────────────────────┐ │
-│ │ 🖥️ k3s-server-01    │ │ │ │ 🖥️ k3s-server-02   │ │ │ │ 🖥️ k3s-server-03    │ │
-│ │ 192.168.1.11        │ │ │ │ 192.168.1.12        │ │ │ │ 192.168.1.13        │ │
-│ │ Keepalived MASTER   │ │ │ │ Keepalived BACKUP   │ │ │ │ Keepalived BACKUP   │ │
-│ │ HAProxy instance    │ │ │ │ HAProxy instance    │ │ │ │ HAProxy instance    │ │
-│ │ Control Plane+etcd  │ │ │ │ Control Plane+etcd  │ │ │ │ Control Plane+etcd  │ │
-│ └─────────────────────┘ │ │ └─────────────────────┘ │ │ └─────────────────────┘ │
-└─────────────────────────┘ └─────────────────────────┘ └─────────────────────────┘
-              │                         │                         │
-              └─────────────┐ ┌─────────┴─────────┐ ┌─────────────┘
-                            │ │                   │ │
-                            ▼ ▼                   ▼ ▼
+                          ┌─────────────▼───────────────┐
+                          │    🌐 Floating IP (VIP)     │
+                          │       192.168.1.10:6443     │
+                          │    Managed by Keepalived    │
+                          └─────────────────────────────┘
+                                    │       │
+              ┌─────────────────────┘       └─────────────────────┐
+              │                                                   │
+              ▼                                                   ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                    🔧 Load Balancer Layer                       │
+    │                                                                 │
+    │ ┌─────────────────────────┐ ┌─────────────────────────┐         │
+    │ │ 🖥️ lb-01                │ │ 🖥️ lb-02               │         │
+    │ │ 192.168.1.8             │ │ 192.168.1.9             │         │
+    │ │ Keepalived MASTER       │ │ Keepalived BACKUP       │         │
+    │ │ HAProxy instance        │ │ HAProxy instance        │         │
+    │ └─────────────────────────┘ └─────────────────────────┘         │
+    └─────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                     ⚙️ K3s Control Plane                        │
+    │                                                                 │
+    │ ┌─────────────────────────┐ ┌─────────────────────────┐         │
+    │ │ 🖥️ k3s-server-01        │ │ 🖥️ k3s-server-02       │         │
+    │ │ 192.168.1.11            │ │ 192.168.1.12            │         │
+    │ │ Control Plane+etcd      │ │ Control Plane+etcd      │         │
+    │ └─────────────────────────┘ └─────────────────────────┘         │
+    │                                                                 │
+    │           ┌─────────────────────────┐                           │
+    │           │ 🖥️ k3s-server-03        │                           │
+    │           │ 192.168.1.13            │                           │
+    │           │ Control Plane+etcd      │                           │
+    │           └─────────────────────────┘                           │
+    └─────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
                     ┌─────────────────────────────────────┐
                     │    🗄️ Embedded etcd Cluster         │
                     │   Distributed across control plane  │
@@ -92,38 +96,76 @@ Our HA K3s setup consists of:
 | Component         | Purpose              | IP Address        | Port    | High Availability     |
 | ----------------- | -------------------- | ----------------- | ------- | --------------------- |
 | **Floating IP**   | Single entry point   | `192.168.1.10`    | `6443`  | Managed by Keepalived |
+| **lb-01**         | Load balancer        | `192.168.1.8`     | `6443`  | Keepalived MASTER     |
+| **lb-02**         | Load balancer        | `192.168.1.9`     | `6443`  | Keepalived BACKUP     |
 | **k3s-server-01** | Control plane + etcd | `192.168.1.11`    | `6443`  | Active member         |
 | **k3s-server-02** | Control plane + etcd | `192.168.1.12`    | `6443`  | Active member         |
 | **k3s-server-03** | Control plane + etcd | `192.168.1.13`    | `6443`  | Active member         |
 | **k3s-worker-01** | Agent node           | `192.168.1.21`    | `10250` | Workload distribution |
 | **k3s-worker-02** | Agent node           | `192.168.1.22`    | `10250` | Workload distribution |
 | **k3s-worker-03** | Agent node           | `192.168.1.23`    | `10250` | Workload distribution |
-| **Keepalived**    | IP failover          | All control nodes | VRRP    | 3-node redundancy     |
-| **HAProxy**       | Load balancing       | All control nodes | `6443`  | 3-instance redundancy |
+| **Keepalived**    | IP failover          | lb-01, lb-02      | VRRP    | 2-node redundancy     |
+| **HAProxy**       | Load balancing       | lb-01, lb-02      | `6443`  | 2-instance redundancy |
 
 ### Traffic Flow
 
 1. **Client Connection**: Clients connect to the floating IP `192.168.1.10:6443`
-2. **Keepalived**: Routes traffic to the current master node (normally k3s-server-01)
+2. **Keepalived**: Routes traffic to the active load balancer (normally lb-01)
 3. **HAProxy**: Load balances incoming API requests across all three K3s control plane servers
 4. **K3s API**: Control plane processes requests and maintains cluster state via embedded etcd
 5. **Worker Communication**: Worker nodes connect to the floating IP for resilient control plane access
 6. **Workload Distribution**: Pods and services are scheduled across the worker nodes for actual workloads
-7. **Failover**: If master node fails, Keepalived automatically promotes backup node
+7. **Failover**: If active load balancer fails, Keepalived automatically promotes backup load balancer
 
 <Aside type="tip">
-  This architecture ensures no single point of failure. Even if two nodes fail
-  simultaneously, the cluster remains operational with the remaining node.
+  This architecture ensures no single point of failure. If a node fails, the cluster remains operational.
 </Aside>
 
 ## Prerequisites
 
 - Proxmox VE environment with VM template (see [Proxmox Ubuntu VM Template Setup Guide](/guides/proxmox-ubuntu-vm-template/))
-- 3 Ubuntu VMs with at least 2 CPU cores and 4GB RAM each
+- 8 Ubuntu VMs total: 2 for load balancers and 3 for K3s servers, each with at least 2 CPU cores and 4GB RAM and 3 for K3s agents, each with at least 2CPU cores and 8GB RAM.
 - Network access between all nodes
 - Basic understanding of Kubernetes concepts
 
-## Step 1: Prepare Server VMs
+## Step 1: Prepare Load Balancer VMs
+
+<Steps>
+1. **Clone VM template for load balancers**
+   
+   Create 2 VMs from your Ubuntu template for dedicated load balancers:
+   
+   - **VM IDs**: 201, 202
+   - **Names**: `lb-01`, `lb-02`
+   - **Clone Mode**: Full clone
+   
+   <Aside type="tip">
+     Distribute load balancer VMs across different Proxmox nodes for hardware redundancy.
+   </Aside>
+
+2. **Configure load balancer hardware resources**
+
+   Navigate to the **Hardware** tab for each VM and adjust:
+
+   - **Memory**: 512 MB (should be sufficient for HAProxy and Keepalived)
+   - **Processors**: 1 core
+   - **Disk**: 10GB
+
+3. **Configure load balancer network settings**
+
+   In the **Cloud-Init** tab, set static IP addresses:
+
+   - **lb-01**: `192.168.1.8/24`
+   - **lb-02**: `192.168.1.9/24`
+   - **Gateway**: `192.168.1.1`
+
+4. **Start and verify load balancer VMs**
+
+   Start both VMs and verify connectivity.
+
+</Steps>
+
+## Step 2: Prepare K3s Server VMs
 
 <Steps>
 1. **Clone VM template**
@@ -174,15 +216,16 @@ Our HA K3s setup consists of:
 
 ## Step 2: Install and Configure Keepalived
 
-Keepalived manages our floating IP address and provides automatic failover between nodes.
+Keepalived manages our floating IP address and provides automatic failover between the dedicated load balancer nodes.
 
 <Aside type="note">
-  Perform these steps on **all three VMs**. Only the configuration will differ
-  between master and backup nodes.
+  Perform these steps on **both load balancer VMs** (lb-01 and lb-02). Only the configuration will differ between master and backup nodes.
 </Aside>
 
 <Steps>
 1. **Install keepalived**
+   
+   Run on both `lb-01` and `lb-02`:
    
    ```bash
    sudo apt update
@@ -191,13 +234,13 @@ Keepalived manages our floating IP address and provides automatic failover betwe
 
 2. **Create keepalived configuration**
 
-   Create the configuration file:
+   Create the configuration file on both VMs:
 
    ```bash
    sudo nano /etc/keepalived/keepalived.conf
    ```
 
-3. **Configure master node** (k3s-server-01)
+3. **Configure master node** (lb-01)
 
    ```bash
    vrrp_instance VI_1 {
@@ -216,9 +259,7 @@ Keepalived manages our floating IP address and provides automatic failover betwe
    }
    ```
 
-4. **Configure backup nodes** (k3s-server-02 and k3s-server-03)
-
-   For **k3s-server-02**:
+4. **Configure backup node** (lb-02)
 
    ```bash
    vrrp_instance VI_1 {
@@ -237,28 +278,9 @@ Keepalived manages our floating IP address and provides automatic failover betwe
    }
    ```
 
-   For **k3s-server-03**:
-
-   ```bash
-   vrrp_instance VI_1 {
-       state BACKUP
-       interface eth0
-       virtual_router_id 55
-       priority 100
-       advert_int 1
-       authentication {
-           auth_type PASS
-           auth_pass SuPeRsEcReT
-       }
-       virtual_ipaddress {
-           192.168.1.10/24
-       }
-   }
-   ```
-
 5. **Start and enable keepalived**
 
-   On all nodes:
+   On both load balancer nodes:
 
    ```bash
    sudo systemctl enable --now keepalived.service
@@ -268,10 +290,9 @@ Keepalived manages our floating IP address and provides automatic failover betwe
 6. **Test failover functionality**
 
    ```bash
-   # Test basic connectivity to individual nodes
-   ping -c 3 192.168.1.11
-   ping -c 3 192.168.1.12
-   ping -c 3 192.168.1.13
+   # Test basic connectivity to load balancer nodes
+   ping -c 3 192.168.1.8
+   ping -c 3 192.168.1.9
 
    # Test floating IP
    ping -c 3 192.168.1.10
@@ -280,16 +301,16 @@ Keepalived manages our floating IP address and provides automatic failover betwe
    Test failover by stopping keepalived on the master:
 
    ```bash
-   # On k3s-server-01 (master)
+   # On lb-01 (master)
    sudo systemctl stop keepalived.service
 
    # The floating IP should still respond
    ping -c 3 192.168.1.10
 
-   # Check which node took over
+   # Check which node took over on lb-02
    sudo systemctl status keepalived.service
 
-   # Restart the service
+   # Restart the service on lb-01
    sudo systemctl start keepalived.service
    ```
 
@@ -297,15 +318,17 @@ Keepalived manages our floating IP address and provides automatic failover betwe
 
 ## Step 3: Install and Configure HAProxy
 
-HAProxy will load balance the K3s API server traffic across all three nodes.
+HAProxy will load balance the K3s API server traffic across all three K3s server nodes.
 
 <Aside type="note">
-  Install HAProxy on **all three VMs** to ensure the load balancer is also
-  highly available.
+  Install HAProxy on **both load balancer VMs** (lb-01 and lb-02) only. This separates the load balancing infrastructure from the K3s servers to avoid port conflicts.
 </Aside>
 
 <Steps>
+
 1. **Install HAProxy**
+   
+   Run on both `lb-01` and `lb-02`:
    
    ```bash
    sudo apt update
@@ -314,7 +337,7 @@ HAProxy will load balance the K3s API server traffic across all three nodes.
 
 2. **Configure HAProxy**
 
-   Edit the HAProxy configuration:
+   Edit the HAProxy configuration on both load balancer VMs:
 
    ```bash
    sudo nano /etc/haproxy/haproxy.cfg
@@ -341,11 +364,17 @@ HAProxy will load balance the K3s API server traffic across all three nodes.
 
 3. **Restart and enable HAProxy**
 
+   Run on both load balancer VMs:
+
    ```bash
    sudo systemctl restart haproxy
    sudo systemctl enable haproxy
    sudo systemctl status haproxy
    ```
+
+   <Aside type="caution">
+   attention: status will show that the k3s-servers are down, which is normal since we did not set them up yet.
+   </Aside>
 
 4. **Verify HAProxy configuration**
 
@@ -361,10 +390,6 @@ HAProxy will load balance the K3s API server traffic across all three nodes.
 
 Now we'll install K3s with embedded etcd to create our highly available cluster.
 
-<Aside type="caution">
-  The following steps are currently being refined. Ensure you have backups.
-</Aside>
-
 <Steps>
 1. **Initialize the first control plane node**
    
@@ -372,7 +397,6 @@ Now we'll install K3s with embedded etcd to create our highly available cluster.
    
    ```bash
    curl -sfL https://get.k3s.io | K3S_TOKEN=SECRET sh -s - server \
-     --bind-address=127.0.0.1 \
      --cluster-init \
      --tls-san=192.168.1.10
    ```
@@ -397,7 +421,6 @@ Now we'll install K3s with embedded etcd to create our highly available cluster.
    ```bash
    curl -sfL https://get.k3s.io | K3S_TOKEN=SECRET sh -s - server \
      --server https://192.168.1.11:6443 \
-     --bind-address=127.0.0.1 \
      --tls-san=192.168.1.10
    ```
 
