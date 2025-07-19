@@ -1,0 +1,233 @@
+---
+title: 'FluxCD GitOps Setup Guide'
+description: 'Complete guide for setting up FluxCD on Kubernetes clusters to enable GitOps workflows with automated deployments and configuration management.'
+pubDate: 2025-07-19
+author: 'Thomas Peire'
+tags:
+  [
+    'fluxcd',
+    'gitops',
+    'kubernetes',
+    'continuous-deployment',
+    'automation',
+    'github',
+    'helm',
+    'homelab',
+  ]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This guide walks you through setting up FluxCD on your Kubernetes cluster to enable GitOps workflows. FluxCD automatically synchronizes your cluster state with your Git repository, providing declarative configuration management and automated deployments.
+
+## What is GitOps?
+
+GitOps is a operational framework that takes DevOps best practices used for application development and applies them to infrastructure automation. With GitOps:
+
+- **Git as single source of truth**: All configuration and infrastructure is declared in Git
+- **Declarative configuration**: Desired state is described declaratively
+- **Automated reconciliation**: Controllers ensure actual state matches desired state
+- **Version control**: All changes are tracked, auditable, and reversible
+
+## Prerequisites
+
+- Running Kubernetes cluster (see [High Availability K3s Setup](/guides/setup-ha-k3s))
+- GitHub account with repository access
+- Local workstation with admin access to install tools
+
+## Architecture Overview
+
+FluxCD consists of several controllers working together:
+
+- **Source Controller**: Manages Git repositories, Helm repositories, and OCI artifacts
+- **Kustomize Controller**: Handles Kustomize overlays and patches
+- **Helm Controller**: Manages Helm chart deployments
+- **Notification Controller**: Sends alerts and notifications
+- **Image Automation Controllers**: Automates image updates
+
+## Installation Steps
+
+<Steps>
+1. **Install required tools**
+   
+   Install FluxCD CLI and GitHub CLI on your workstation:
+   
+   ```powershell
+   # Install FluxCD CLI
+   winget install fluxcd.flux
+   
+   # Install GitHub CLI
+   winget install github.cli
+   ```
+   
+   Verify installations:
+   
+   ```powershell
+   flux --version
+   gh --version
+   ```
+
+2. **Authenticate with GitHub**
+
+   Authenticate GitHub CLI with your account:
+
+   ```powershell
+   gh auth login
+   ```
+
+   Follow the interactive prompts to:
+
+   - Select GitHub.com
+   - Choose authentication method (web browser recommended)
+   - Complete authentication in browser
+
+3. **Pre-flight checks**
+
+   Verify your Kubernetes cluster is ready for FluxCD:
+
+   ```powershell
+   flux check --pre
+   ```
+
+   This checks:
+
+   - Kubernetes API connectivity
+   - Required Kubernetes version (1.20+)
+   - Network policies compatibility
+
+4. **Bootstrap FluxCD with GitHub**
+
+   Bootstrap FluxCD to your cluster and GitHub repository:
+
+   ```powershell
+   # Basic bootstrap with HTTPS (recommended)
+   flux bootstrap github \
+     --token-auth \
+     --owner=YOUR_GITHUB_USERNAME \
+     --repository=YOUR_REPO_NAME \
+     --branch=main \
+     --path=clusters/CLUSTER_NAME \
+     --personal
+   ```
+
+   {' '}
+
+   <Aside type="tip">
+     Replace `YOUR_GITHUB_USERNAME`, `YOUR_REPO_NAME`, and `CLUSTER_NAME` with
+     your actual values. The `--personal` flag indicates this is a personal
+     repository rather than an organization repo.
+   </Aside>
+
+   **Alternative with SSH (optional):**
+
+   ```powershell
+   # Bootstrap with SSH keys
+   flux bootstrap github \
+     --owner=YOUR_GITHUB_USERNAME \
+     --repository=YOUR_REPO_NAME \
+     --branch=main \
+     --path=clusters/CLUSTER_NAME \
+     --personal \
+     --ssh-key-algorithm=ecdsa
+   ```
+
+   When prompted, provide your GitHub Personal Access Token with:
+
+   - **repo** scope (full repository access)
+   - **workflow** scope (for GitHub Actions integration)
+
+5. **Verify installation**
+
+   Check that FluxCD is running correctly:
+
+   ```powershell
+   # Check FluxCD status
+   flux check
+
+   # View FluxCD pods
+   kubectl get pods -n flux-system
+
+   # Check FluxCD logs
+   flux logs --follow
+   ```
+
+   Expected output should show all controllers as ready and healthy.
+
+</Steps>
+
+## Post-Installation Configuration
+
+### Repository Structure
+
+FluxCD creates the following structure in your repository:
+
+```
+clusters/CLUSTER_NAME/
+├── flux-system/
+│   ├── gotk-components.yaml    # FluxCD controllers
+│   ├── gotk-sync.yaml         # Git repository sync config
+│   └── kustomization.yaml     # Kustomize configuration
+└── README.md                  # Auto-generated documentation
+```
+
+### Adding Applications
+
+Create application manifests in your repository:
+
+```powershell
+# Create apps directory
+mkdir clusters/CLUSTER_NAME/apps
+
+# Add your application manifests
+# Example: nginx deployment
+```
+
+Example application structure:
+
+```
+clusters/CLUSTER_NAME/
+├── apps/
+│   ├── nginx/
+│   │   ├── deployment.yaml
+│   │   ├── service.yaml
+│   │   └── kustomization.yaml
+│   └── kustomization.yaml
+└── flux-system/
+    └── ...
+```
+
+### Helm Repository Management
+
+Add external Helm repositories:
+
+```yaml
+# clusters/CLUSTER_NAME/sources/helm-repos.yaml
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: bitnami
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://charts.bitnami.com/bitnami
+```
+
+## Security Best Practices
+
+<Aside type="caution">
+  Never commit secrets directly to your Git repository. Use Kubernetes secrets,
+  external secret management, or FluxCD's built-in secret management features.
+</Aside>
+
+### Secret Management
+
+- Use `SealedSecrets` or `External Secrets Operator`
+- Encrypt sensitive data before committing
+- Implement proper RBAC policies
+- Regular secret rotation
+
+<Aside type="tip">
+  Your FluxCD setup is now complete! Any changes pushed to your Git repository
+  will be automatically applied to your cluster. This enables true GitOps
+  workflows for your infrastructure and applications.
+</Aside>
