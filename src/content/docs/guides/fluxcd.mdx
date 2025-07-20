@@ -179,7 +179,7 @@ Create application manifests in your repository:
 mkdir clusters/CLUSTER_NAME/apps
 
 # Add your application manifests
-# Example: nginx deployment
+# Example: demo-app deployment
 ```
 
 Example application structure:
@@ -187,29 +187,13 @@ Example application structure:
 ```
 clusters/CLUSTER_NAME/
 ├── apps/
-│   ├── nginx/
+│   ├── demo-app/
 │   │   ├── deployment.yaml
 │   │   ├── service.yaml
 │   │   └── kustomization.yaml
 │   └── kustomization.yaml
 └── flux-system/
     └── ...
-```
-
-### Helm Repository Management
-
-Add external Helm repositories:
-
-```yaml
-# clusters/CLUSTER_NAME/sources/helm-repos.yaml
-apiVersion: source.toolkit.fluxcd.io/v1beta2
-kind: HelmRepository
-metadata:
-  name: bitnami
-  namespace: flux-system
-spec:
-  interval: 1h
-  url: https://charts.bitnami.com/bitnami
 ```
 
 ## Security Best Practices
