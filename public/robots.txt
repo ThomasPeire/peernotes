@@ -4,7 +4,7 @@ Allow: /
 # Sitemaps
 Sitemap: https://docs.thomaspeire.be/sitemap-index.xml
 
-# Crawl-delay
+# Crawl-delay  
 Crawl-delay: 1
 
 # Allow all major search engines
