@@ -174,16 +174,42 @@ export default defineConfig({
 			],
 			sidebar: [
 				{
-					label: 'Introduction',
+					label: 'Getting Started',
 					autogenerate: { directory: 'introduction' },
 				},
 				{
-					label: 'Cheatsheets',
+					label: 'Quick Reference',
 					autogenerate: { directory: 'cheatsheets' },
 				},
 				{
-					label: 'Guides',
-					autogenerate: { directory: 'guides' },
+					label: 'Kubernetes & Container Orchestration',
+					items: [
+						{ label: 'Kubernetes Installation on WSL2', link: '/guides/install-kubernetes-on-wsl/' },
+						{ label: 'High Availability K3s Setup', link: '/guides/setup-ha-k3s/' },
+						{ label: 'FluxCD GitOps', link: '/guides/fluxcd/' },
+						{ label: 'Longhorn with FluxCD Installation', link: '/guides/longhorn-fluxcd-installation/' },
+					],
+				},
+				{
+					label: 'Virtualization & Infrastructure',
+					items: [
+						{ label: 'Proxmox Cluster Setup', link: '/guides/proxmox-cluster/' },
+						{ label: 'Proxmox Ubuntu VM Template', link: '/guides/proxmox-ubuntu-vm-template/' },
+						{ label: 'Creating Bootable VHDX', link: '/guides/bootable-vhdx/' },
+					],
+				},
+				{
+					label: 'Development & DevOps',
+					items: [
+						{ label: 'Dev Tunnels', link: '/guides/devtunnels/' },
+						{ label: 'SSH Setup using ssh-import-id', link: '/guides/setting-up-ssh-using-ssh-import-id/' },
+					],
+				},
+				{
+					label: 'Productivity & Tools',
+					items: [
+						{ label: 'PowerToys Run Shortcuts', link: '/guides/powertoys-run-shortcuts/' },
+					],
 				},
 				{
 					label: 'Tools & Technologies',
