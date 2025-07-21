@@ -1,0 +1,372 @@
+---
+title: 'Install Longhorn with FluxCD'
+description: 'Complete guide for deploying Longhorn distributed storage system on Kubernetes using GitOps with FluxCD for persistent volume management in highly available clusters.'
+pubDate: 2025-07-19
+author: 'Thomas Peire'
+tags:
+  [
+    'longhorn',
+    'kubernetes',
+    'storage',
+    'persistent-volumes',
+    'fluxcd',
+    'gitops',
+    'distributed-storage',
+    'homelab',
+  ]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This guide walks you through installing Longhorn distributed storage system on your Kubernetes cluster using FluxCD for GitOps-based deployment and management.
+
+<Aside type="note">
+  Longhorn provides distributed block storage for Kubernetes with built-in
+  backup, snapshot, and disaster recovery capabilities. Using FluxCD ensures
+  your storage configuration is versioned and declaratively managed.
+</Aside>
+
+## Prerequisites
+
+- Running Kubernetes cluster (see [High Availability K3s Setup](/guides/setup-ha-k3s))
+- FluxCD installed and configured (see [FluxCD Setup](/guides/fluxcd))
+- Git repository for GitOps configuration
+- Worker nodes with adequate disk space for storage pools
+- Optionally: ingress controller
+
+## Architecture Overview
+
+Longhorn provides distributed block storage with the following components:
+
+- **Longhorn Manager**: Orchestrates volumes and handles API requests
+- **Longhorn Engine**: Handles actual read/write operations for volumes
+- **Longhorn UI**: Web-based management interface
+- **CSI Driver**: Kubernetes Container Storage Interface implementation
+- **Instance Manager**: Manages Longhorn engine and replica instances
+
+## Installation Steps
+
+<Steps>
+1. **Prepare storage requirements**
+   
+   Verify your worker nodes have adequate storage and meet Longhorn requirements:
+   
+   ```bash
+   # Check available disk space on worker nodes
+   kubectl get nodes -o wide
+   
+   # Verify each worker node has at least 10GB available storage
+   # Longhorn will use local storage from each node
+   ```
+   
+   <Aside type="tip">
+     Longhorn requires each node to have `open-iscsi` installed. For Ubuntu/Debian nodes, this is typically already included.
+     If not, run these commands on the K3s nodes:
+     ```bash
+     apt-get update && apt-get install -y open-iscsi util-linux e2fsprogs mount xfsprogs
+     systemctl enable --now iscsid
+     ```
+   </Aside>
+
+2. **Create Longhorn namespace and source**
+
+   Add the Longhorn Helm repository as a FluxCD source in your GitOps repository:
+
+   ```yaml
+   # clusters/CLUSTER_NAME/infrastructure/longhorn/helmrepository.yaml
+   apiVersion: source.toolkit.fluxcd.io/v1
+   kind: HelmRepository
+   metadata:
+     name: longhorn
+     namespace: flux-system
+   spec:
+     interval: 1h
+     url: https://charts.longhorn.io
+   ```
+
+   ```yaml
+   # clusters/CLUSTER_NAME/infrastructure/longhorn/namespace.yaml
+   apiVersion: v1
+   kind: Namespace
+   metadata:
+     name: longhorn
+     labels:
+       name: longhorn
+   ```
+
+3. **Configure Longhorn Helm release**
+
+   Create the Longhorn Helm release configuration:
+
+   ```yaml
+   # clusters/CLUSTER_NAME/infrastructure/longhorn/helmrelease.yaml
+   apiVersion: helm.toolkit.fluxcd.io/v2
+   kind: HelmRelease
+   metadata:
+     name: longhorn
+     namespace: longhorn
+   spec:
+     chart:
+       spec:
+         chart: longhorn
+         version: '1.9.x'
+         interval: 5h
+         sourceRef:
+           kind: HelmRepository
+           name: longhorn
+           namespace: flux-system
+     releaseName: longhorn
+     interval: 1h
+     values:
+       ingress: # optional
+         enabled: true
+         host: longhorn.local.peerlab.be
+     dependsOn: # optional
+       - name: traefik
+         namespace: traefik
+   ```
+
+4. **Create kustomization files**
+
+   Create kustomization files to manage the deployment:
+
+   ```yaml
+   # clusters/CLUSTER_NAME/infrastructure/longhorn/kustomization.yaml
+   resources:
+     - namespace.yaml
+     - helmrepository.yaml
+     - helmrelease.yaml
+   ```
+
+   ```yaml
+   # clusters/CLUSTER_NAME/infrastructure/kustomization.yaml
+   apiVersion: kustomize.config.k8s.io/v1beta1
+   kind: Kustomization
+   resources:
+     - ./longhorn
+   ```
+
+5. **Update main cluster kustomization**
+
+   Add the infrastructure as kustomization to your main cluster:
+
+   ```yaml
+   # clusters/CLUSTER_NAME/infrastructure.yaml
+   apiVersion: kustomize.toolkit.fluxcd.io/v1
+   kind: Kustomization
+   metadata:
+     name: infrastructure
+     namespace: flux-system
+   spec:
+     interval: 10m0s
+     path: ./infrastructure/peercluster
+     prune: true
+     sourceRef:
+       kind: GitRepository
+       name: flux-system
+     dependsOn:
+       - name: flux-system
+   ```
+
+   when done your flux directory should look something like this
+   Your FluxCD repository directory structure should look like this:
+
+   ```
+   flux-repo/
+   ├── apps/
+   │   ├── base/
+   │   └── peercluster/
+   ├── clusters/
+   │   └── peercluster/
+   │       ├── flux-system/
+   │       ├── apps.yaml
+   │       └── infrastructure.yaml
+   └── infrastructure/
+       ├── base/
+       │   ├── kustomization.yaml
+       │   └── longhorn/
+       │       ├── helmrelease.yaml
+       │       ├── helmrepository.yaml
+       │       ├── kustomization.yaml
+       │       └── namespace.yaml
+       └── peercluster/
+           └── kustomization.yaml
+   ```
+
+6. **Verify installation**
+
+   After committing and pushing your changes, verify the installation:
+
+   ```bash
+   # Check FluxCD reconciliation
+   flux get helmreleases -A
+
+   # Check Longhorn pods
+   kubectl get pods -n longhorn
+
+   # Verify storage class
+   kubectl get storageclass
+
+   # Check Longhorn manager status
+   kubectl get daemonset longhorn-manager -n longhorn
+   ```
+
+</Steps>
+
+## Configuration
+
+### Default Storage Class
+
+Longhorn will automatically become the default storage class. To verify:
+
+```bash
+kubectl get storageclass
+# Should show longhorn marked as (default)
+```
+
+### Access Longhorn UI
+
+Access the Longhorn management interface:
+
+```bash
+# Port forward to access UI locally
+kubectl port-forward -n longhorn svc/longhorn-frontend 8080:80
+
+# Access via browser at: http://localhost:8080
+```
+
+#### Ingress Configuration
+
+We configured ingress in our Helm release, so you can access the UI directly at the configured hostname (in our example: `longhorn.local.peerlab.be`).
+
+<Aside type="note">
+  If you're using a load balancer with HAProxy, you may need to configure proper
+  backend routing.
+</Aside>
+
+**Example HAProxy Configuration** (if needed for your setup):
+
+```haproxy
+
+# ... exitsing config ...
+
+# Traefik HTTP Load Balancer
+frontend traefik_http_frontend
+    bind *:80
+    mode http
+    default_backend traefik_http_backend
+
+backend traefik_http_backend
+    mode http
+    balance roundrobin
+    option tcp-check
+    server k3s-server-01 192.168.1.11:30097 check
+    server k3s-server-02 192.168.1.12:30097 check
+    server k3s-server-03 192.168.1.13:30097 check
+    server k3s-worker-01 192.168.1.21:30097 check
+    server k3s-worker-02 192.168.1.22:30097 check
+    server k3s-worker-03 192.168.1.23:30097 check
+
+# Traefik HTTPS Load Balancer
+frontend traefik_https_frontend
+    bind *:443
+    mode tcp
+    default_backend traefik_https_backend
+
+backend traefik_https_backend
+    mode tcp
+    balance roundrobin
+    server k3s-server-01 192.168.1.11:30551 check
+    server k3s-server-02 192.168.1.12:30551 check
+    server k3s-server-03 192.168.1.13:30551 check
+    server k3s-worker-01 192.168.1.21:30551 check
+    server k3s-worker-02 192.168.1.22:30551 check
+    server k3s-worker-03 192.168.1.23:30551 check
+```
+
+## Testing and Validation
+
+### Create Test Volume
+
+Test Longhorn with a simple PVC:
+
+```yaml
+# test-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: longhorn-test-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+```
+
+```bash
+# Apply test PVC
+kubectl apply -f test-pvc.yaml
+
+# Check PVC status
+kubectl get pvc longhorn-test-pvc
+
+# Check volume in Longhorn UI
+```
+
+### Test Pod with Persistent Storage
+
+```yaml
+# test-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: longhorn-test-pod
+spec:
+  containers:
+    - name: test-container
+      image: nginx:alpine
+      volumeMounts:
+        - name: test-volume
+          mountPath: /data
+  volumes:
+    - name: test-volume
+      persistentVolumeClaim:
+        claimName: longhorn-test-pvc
+```
+
+```bash
+# Apply test pod
+kubectl apply -f test-pod.yaml
+
+# Verify pod is running
+kubectl get pod longhorn-test-pod
+
+# Test data persistence
+kubectl exec longhorn-test-pod -- sh -c 'echo "test data" > /data/test.txt'
+kubectl exec longhorn-test-pod -- cat /data/test.txt
+```
+
+### Clean Up Test Resources
+
+After testing, remove the test resources to clean up your cluster:
+
+```bash
+# Delete test pod
+kubectl delete pod longhorn-test-pod
+
+# Delete test PVC (this will also delete the associated PV)
+kubectl delete pvc longhorn-test-pvc
+```
+
+<Aside type="caution">
+  Deleting a PVC will permanently remove the associated volume and all its data.
+  Make sure you no longer need the test data before cleanup.
+</Aside>
+
+<Aside type="tip">
+  Your Longhorn storage system is now ready! All persistent volumes will
+  automatically use Longhorn's distributed storage, providing high availability
+  and data protection across your cluster nodes.
+</Aside>
