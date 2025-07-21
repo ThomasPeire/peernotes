@@ -9,7 +9,7 @@ export default defineConfig({
 	integrations: [
 		sitemapPlugin(),
 		starlight({
-			title: 'PeerNotes - Technical Documentation Hub',
+			title: 'PeerNotes',
 			description: 'Complete guides and tutorials for Kubernetes, Proxmox, DevOps, and system administration. Step-by-step instructions for setting up K3s clusters, FluxCD GitOps, homelab infrastructure, and enterprise-grade solutions.',
 			defaultLocale: 'en',
 			locales: {
@@ -18,6 +18,7 @@ export default defineConfig({
 					lang: 'en-US',
 				},
 			},
+			favicon: '/favicon.svg',
 			social: {
 				github: 'https://github.com/thomaspeire/peernotes',
 			},
@@ -97,6 +98,43 @@ export default defineConfig({
 					attrs: {
 						rel: 'canonical',
 						href: 'https://docs.thomaspeire.be/',
+					},
+				},
+				{
+					tag: 'link',
+					attrs: {
+						rel: 'icon',
+						type: 'image/svg+xml',
+						href: '/favicon.svg',
+					},
+				},
+				{
+					tag: 'link',
+					attrs: {
+						rel: 'shortcut icon',
+						href: '/favicon.svg',
+					},
+				},
+				{
+					tag: 'link',
+					attrs: {
+						rel: 'apple-touch-icon',
+						sizes: '180x180',
+						href: '/favicon.svg',
+					},
+				},
+				{
+					tag: 'link',
+					attrs: {
+						rel: 'manifest',
+						href: '/site.webmanifest',
+					},
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'theme-color',
+						content: '#3b82f6',
 					},
 				},
 				{
