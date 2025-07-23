@@ -187,6 +187,7 @@ export default defineConfig({
 						{ label: 'Kubernetes Installation on WSL2', link: '/guides/install-kubernetes-on-wsl/' },
 						{ label: 'High Availability K3s Setup', link: '/guides/setup-ha-k3s/' },
 						{ label: 'FluxCD GitOps', link: '/guides/fluxcd/' },
+						{ label: 'FluxCD with SOPS Encrypted Secrets', link: '/guides/fluxcd-sops-encrypted-secrets/' },
 						{ label: 'Longhorn with FluxCD Installation', link: '/guides/longhorn-fluxcd-installation/' },
 					],
 				},
