@@ -1,0 +1,382 @@
+---
+title: 'PostgreSQL on Kubernetes with Longhorn Storage'
+description: 'Complete guide to deploying PostgreSQL on Kubernetes using StatefulSets with Longhorn storage for persistent data and high availability.'
+author: 'Thomas Peire'
+pubDate: 2025-07-23
+tags:
+  [
+    'postgresql',
+    'kubernetes',
+    'longhorn',
+    'statefulset',
+    'database',
+    'persistent-storage',
+    'secrets',
+    'sops',
+  ]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This guide explains how to deploy PostgreSQL on Kubernetes using StatefulSets with Longhorn storage for persistent data. We'll set up a production-ready PostgreSQL instance with proper resource management, health checks, and encrypted secrets using FluxCD GitOps workflow.
+
+## Why Use StatefulSets for PostgreSQL?
+
+<Aside type="note">
+  StatefulSets are ideal for databases because they provide stable network
+  identities, ordered deployment, and persistent storage that survives pod
+  restarts.
+</Aside>
+
+**Benefits of this setup:**
+
+- **Persistent data**: Survives pod restarts and rescheduling
+- **Longhorn storage**: Distributed storage with replication and backup capabilities
+- **Resource management**: Proper CPU and memory limits
+- **Health monitoring**: Liveness and readiness probes
+- **Encrypted secrets**: Secure credential management with SOPS
+
+## Prerequisites
+
+- Kubernetes cluster with Longhorn storage installed
+- FluxCD installed and configured in your cluster
+- Worker nodes with `nfs-common` package installed
+- Git repository configured with FluxCD
+- SOPS configured for secret encryption (see [FluxCD SOPS guide](/guides/fluxcd-sops-encrypted-secrets))
+
+## Step 1: Prepare Worker Nodes
+
+<Steps>
+1. **Install NFS utilities on worker nodes**
+   
+   Connect to each worker node and install the required package:
+   ```bash
+   sudo apt install -y nfs-common
+   ```
+
+2. **Verify Longhorn storage class**
+   ```bash
+   kubectl get storageclass longhorn
+   ```
+
+</Steps>
+
+## Step 2: Create Namespace
+
+**Create namespace manifest**
+
+Create `namespace.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres
+  labels:
+    name: postgres
+```
+
+## Step 3: Create PostgreSQL Secret
+
+<Steps>
+1. **Create secret manifest**
+   
+   Create `secret.yaml` with your PostgreSQL credentials:
+   ```yaml
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: postgres-secret
+     namespace: postgres
+     labels:
+       app: postgres
+   type: Opaque
+   stringData:
+     POSTGRES_DB: main_db
+     POSTGRES_USER: thomas
+     POSTGRES_PASSWORD: YourSecurePassword123!
+   ```
+
+2. **Encrypt the secret with SOPS**
+
+   Before committing to Git, encrypt the secret:
+
+   ```bash
+   sops --encrypt --in-place secret.yaml
+   ```
+
+3. **Verify encryption**
+   The secret values should now be encrypted:
+   ```yaml
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: postgres-secret
+     namespace: postgres
+     labels:
+       app: postgres
+   type: Opaque
+   stringData:
+     POSTGRES_DB: ENC[AES256_GCM,data:...
+     POSTGRES_USER: ENC[AES256_GCM,data:...
+     POSTGRES_PASSWORD: ENC[AES256_GCM,data:...
+   ```
+
+</Steps>
+
+<Aside type="caution">
+  Always encrypt secrets before committing to Git. See the [FluxCD SOPS
+  guide](/guides/fluxcd-sops-encrypted-secrets) for detailed instructions.
+</Aside>
+
+## Step 4: Create PostgreSQL StatefulSet
+
+<Steps>
+1. **Create StatefulSet manifest**
+   
+   Create `deployment.yaml`:
+   ```yaml
+   apiVersion: apps/v1
+   kind: StatefulSet
+   metadata:
+     name: postgres
+     namespace: postgres
+   spec:
+     replicas: 1
+     serviceName: postgres
+     persistentVolumeClaimRetentionPolicy:
+       whenDeleted: Retain
+       whenScaled: Retain
+     selector:
+       matchLabels:
+         app: postgres
+     template:
+       metadata:
+         labels:
+           app: postgres
+       spec:
+         containers:
+           - name: postgres
+             image: "postgres:14.8"
+             imagePullPolicy: IfNotPresent
+             ports:
+               - containerPort: 5432
+             env:
+               - name: PGDATA
+                 value: /var/lib/postgresql/data/pgdata
+             envFrom:
+               - secretRef:
+                   name: postgres-secret
+             resources:
+               requests:
+                 memory: "256Mi"
+                 cpu: "250m"
+               limits:
+                 memory: "1Gi"
+                 cpu: "1000m"
+             livenessProbe:
+               exec:
+                 command:
+                   - /bin/sh
+                   - -c
+                   - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+               initialDelaySeconds: 30
+               periodSeconds: 10
+               timeoutSeconds: 5
+               failureThreshold: 6
+             readinessProbe:
+               exec:
+                 command:
+                   - /bin/sh
+                   - -c
+                   - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+               initialDelaySeconds: 5
+               periodSeconds: 10
+               timeoutSeconds: 5
+               failureThreshold: 6
+             volumeMounts:
+               - mountPath: /var/lib/postgresql/data
+                 name: postgresdata
+     volumeClaimTemplates:
+       - metadata:
+           name: postgresdata
+           labels:
+             app: postgres
+         spec:
+           storageClassName: longhorn
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+   ```
+
+2. **Understanding the configuration**
+   Key configuration details:
+   - **PGDATA**: Custom data directory to avoid permission issues
+   - **Resources**: Memory and CPU limits for production use
+   - **Probes**: Health checks ensure database is ready and responsive
+   - **Volume**: 20GB persistent storage with Longhorn
+   - **Retention policy**: Keeps data when StatefulSet is deleted
+
+</Steps>
+
+## Step 5: Create PostgreSQL Service
+
+<Steps>
+1. **Create service manifest**
+   
+   Create `service.yaml`:
+   ```yaml
+   apiVersion: v1
+   kind: Service
+   metadata:
+     name: postgres
+     namespace: postgres
+     labels:
+       app: postgres
+   spec:
+     type: NodePort
+     ports:
+       - protocol: TCP
+         name: postgres
+         port: 5432
+         targetPort: 5432
+         nodePort: 30002
+     selector:
+       app: postgres
+   ```
+
+2. **Service configuration options**
+   Choose the appropriate service type for your needs:
+   - **NodePort**: External access via node IP and port 30002
+   - **ClusterIP**: Internal cluster access only (change `type: ClusterIP` and remove `nodePort`)
+   - **LoadBalancer**: External load balancer (if supported by your cluster)
+
+</Steps>
+
+<Aside type="tip">
+  For production environments, consider using ClusterIP and accessing PostgreSQL
+  through an ingress controller or VPN for better security.
+</Aside>
+
+## Step 6: Create Kustomization
+
+<Steps>
+1. **Create kustomization manifest**
+   
+   Create `kustomization.yaml` to deploy all resources together:
+   ```yaml
+   apiVersion: kustomize.config.k8s.io/v1beta1
+   kind: Kustomization
+   
+   resources:
+     - namespace.yaml
+     - secret.yaml
+     - deployment.yaml
+     - service.yaml
+   ```
+
+2. **Add to infrastructure kustomization**
+
+   PostgreSQL is managed as part of my infrastructure setup. Make sure your postgress kustomization is being picked up by flux:
+
+   ```yaml
+   apiVersion: kustomize.config.k8s.io/v1beta1
+   kind: Kustomization
+
+   resources:
+     - ./traefik
+     - ./longhorn
+     - ./postgres
+   ```
+
+3. **Repository structure**
+   ```
+   infrastructure/
+   ├── kustomization.yaml  # Main infrastructure kustomization
+   ├── traefik/
+   ├── longhorn/
+   └── postgres/
+       ├── namespace.yaml
+       ├── secret.yaml
+       ├── deployment.yaml
+       ├── service.yaml
+       └── kustomization.yaml
+   ```
+
+</Steps>
+
+## Step 7: Deploy via GitOps
+
+<Steps>
+1. **Commit PostgreSQL files to Git**
+   ```bash
+   git add infrastructure/postgres/
+   git commit -m "Add PostgreSQL deployment to infrastructure"
+   git push origin main
+   ```
+
+2. **Wait for FluxCD to reconcile**
+   FluxCD will automatically detect the changes and deploy PostgreSQL as part of your infrastructure:
+
+   ```bash
+   # Watch infrastructure reconciliation
+   flux get kustomizations -w
+
+   # Check infrastructure kustomization status
+   flux get kustomization infrastructure
+   ```
+
+3. **Verify deployment**
+
+   ```bash
+   # Check StatefulSet status
+   kubectl get statefulset -n postgres
+   kubectl get pods -n postgres
+
+   # Verify persistent volume
+   kubectl get pvc -n postgres
+   kubectl get pv
+
+   # Check service
+   kubectl get service -n postgres
+   ```
+
+4. **Monitor logs**
+   ```bash
+   kubectl logs -n postgres postgres-0
+   ```
+
+</Steps>
+
+## Step 8: Test PostgreSQL Connection
+
+<Steps>
+1. **Connect from within the cluster**
+   ```bash
+   kubectl exec -it -n postgres postgres-0 -- psql -U thomas -d main_db
+   ```
+
+2. **Test basic operations**
+
+   ```sql
+   -- Create a test table
+   CREATE TABLE test_table (id SERIAL PRIMARY KEY, name VARCHAR(50));
+
+   -- Insert test data
+   INSERT INTO test_table (name) VALUES ('Hello PostgreSQL');
+
+   -- Query the data
+   SELECT * FROM test_table;
+
+   -- Exit
+   \q
+   ```
+
+3. **Connect externally (if using NodePort)**
+   ```bash
+   psql -h <node-ip> -p 30002 -U thomas -d main_db
+   ```
+
+</Steps>

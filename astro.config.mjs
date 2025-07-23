@@ -189,6 +189,7 @@ export default defineConfig({
 						{ label: 'FluxCD GitOps', link: '/guides/fluxcd/' },
 						{ label: 'FluxCD with SOPS Encrypted Secrets', link: '/guides/fluxcd-sops-encrypted-secrets/' },
 						{ label: 'Longhorn with FluxCD Installation', link: '/guides/longhorn-fluxcd-installation/' },
+						{ label: 'PostgreSQL on Kubernetes with Longhorn', link: '/guides/postgres/' },
 					],
 				},
 				{
