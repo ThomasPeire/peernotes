@@ -130,6 +130,55 @@ git branch --list
 git branch -D BRANCH-NAME
 ```
 
+## Working with worktrees
+
+Git worktrees allow you to have multiple working directories from the same repository, each checked out to a different branch.
+
+```bash
+# List all worktrees
+git worktree list
+
+# Create a new worktree for a new branch
+git worktree add ../feature-branch new-feature
+
+# Create a new worktree for an existing branch
+git worktree add ../hotfix-branch hotfix/critical-bug
+
+# Create a worktree with a specific path and branch name
+git worktree add /path/to/worktree branch-name
+
+# Remove a worktree (must be done from outside the worktree)
+git worktree remove ../feature-branch
+
+# Remove a worktree forcefully (even if it has uncommitted changes)
+git worktree remove --force ../feature-branch
+
+# Prune worktree references for deleted directories
+git worktree prune
+```
+
+### Worktree workflow example
+
+```bash
+# From your main repository
+git worktree add ../feature-ui feature/new-ui
+
+# Switch to the worktree directory
+cd ../feature-ui
+
+# Work on your feature (add, commit, push as normal)
+git add .
+git commit -m "Add new UI components"
+git push -u origin feature/new-ui
+
+# Switch back to main repository
+cd ../main-repo
+
+# Clean up when feature is merged
+git worktree remove ../feature-ui
+git branch -d feature/new-ui
+```
+
 ## Finding commit that introduced a bug
 Use `git bisect` to find the commit that introduced a bug
 ```bash
