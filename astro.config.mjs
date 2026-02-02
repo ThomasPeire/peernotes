@@ -205,6 +205,8 @@ export default defineConfig({
 					items: [
 						{ label: 'Dev Tunnels', link: '/guides/devtunnels/' },
 						{ label: 'SSH Setup using ssh-import-id', link: '/guides/setting-up-ssh-using-ssh-import-id/' },
+						{ label: 'Granting OpenClaw Access to GitHub', link: '/guides/openclaw-github-access/' },
+						{ label: 'Setting up OpenClaw on Ubuntu', link: '/guides/setup-openclaw-ubuntu/' },
 					],
 				},
 				{
