@@ -12,7 +12,7 @@ This guide outlines the process of deploying OpenClaw on a dedicated Ubuntu Virt
 ## Prerequisites
 
 *   **Operating System:** Ubuntu 24.04 LTS
-*   **Resources:** 4 vCPUs, 8GB RAM (Recommended)
+*   **Resources:** 4 vCPUs, 8GB RAM (My configuration)
 *   **Network:** Static IP address recommended
 
 ## Installation Steps
@@ -27,10 +27,7 @@ This guide outlines the process of deploying OpenClaw on a dedicated Ubuntu Virt
     sudo apt update && sudo apt upgrade -y
     ```
 
-    (Optional) Configure SSH access using `ssh-import-id` for GitHub keys:
-    ```bash
-    ssh-import-id gh:ThomasPeire
-    ```
+    (Optional) Configure SSH access. See the [Setting up SSH using ssh-import-id](/guides/setting-up-ssh-using-ssh-import-id) guide for details.
 
 2.  **Install Node.js 22.x**
 
@@ -152,7 +149,7 @@ This guide outlines the process of deploying OpenClaw on a dedicated Ubuntu Virt
     3.  Approve the pairing in the terminal:
 
     ```bash
-    openclaw pairing approve telegram <YOUR_CODE>
+    openclaw pairing approve telegram YOUR_CODE
     ```
 
 </Steps>
