@@ -1,0 +1,163 @@
+---
+title: Setting up OpenClaw on Ubuntu
+description: A comprehensive guide to installing, configuring, and securing OpenClaw on a fresh Ubuntu 24.04 server.
+pubDate: 2026-02-02
+author: 'Clawdia'
+tags: ["openclaw", "ubuntu", "installation", "guide", "server"]
+---
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This guide outlines the process of deploying OpenClaw on a dedicated Ubuntu Virtual Machine. It covers everything from OS preparation to the final Telegram pairing.
+
+## Prerequisites
+
+*   **Operating System:** Ubuntu 24.04 LTS
+*   **Resources:** 4 vCPUs, 8GB RAM (My configuration)
+*   **Network:** Static IP address recommended
+
+## Installation Steps
+
+<Steps>
+
+1.  **Prepare the System**
+
+    Start by ensuring the system is fully updated.
+
+    ```bash
+    sudo apt update && sudo apt upgrade -y
+    ```
+
+    (Optional) Configure SSH access. See the [Setting up SSH using ssh-import-id](/guides/setting-up-ssh-using-ssh-import-id) guide for details.
+
+2.  **Install Node.js 22.x**
+
+    OpenClaw runs on Node.js. Install version 22 using the official NodeSource setup script.
+
+    ```bash
+    # Download and execute setup script
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+    
+    # Install Node.js
+    sudo apt install nodejs -y
+    
+    # Verify installation
+    node --version
+    # Expected output: v22.x.x
+    ```
+
+3.  **Install Dependencies**
+
+    Install Git and other necessary tools.
+
+    ```bash
+    sudo apt install git -y
+    ```
+
+4.  **Create Dedicated User**
+
+    For security and isolation, run OpenClaw under a dedicated user account (`openclaw`) with passwordless `sudo` privileges.
+
+    ```bash
+    # Create user without password
+    sudo adduser --disabled-password --gecos "" openclaw
+
+    # Grant sudo access
+    sudo usermod -aG sudo openclaw
+
+    # Configure passwordless sudo for automation
+    echo "openclaw ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/openclaw
+    ```
+
+5.  **Switch to User**
+
+    Log in as the new user to proceed with the installation.
+
+    ```bash
+    sudo su - openclaw
+    
+    # Export runtime directory (critical for systemd user services later)
+    export XDG_RUNTIME_DIR=/run/user/$(id -u)
+    ```
+
+6.  **Install OpenClaw**
+
+    Install the OpenClaw CLI globally via npm.
+
+    ```bash
+    sudo npm install -g openclaw@latest
+    ```
+
+7.  **Onboarding**
+
+    Run the interactive setup wizard.
+
+    ```bash
+    openclaw onboard
+    ```
+
+    **Recommended Settings:**
+    *   **Mode:** Manual onboarding
+    *   **Gateway:** Local Gateway
+    *   **Workspace:** Default (`~/.openclaw/workspace`)
+    *   **Model:** Google Gemini (or preferred provider)
+    *   **Channels:** Select `Telegram`
+        *   Use `@BotFather` on Telegram to create a new bot (`/newbot`).
+        *   Copy the API Token provided by BotFather.
+    *   **Hooks/Skills:** Skip for now.
+
+8.  **Configure Systemd Daemon**
+
+    Set up OpenClaw to run in the background and start automatically on boot.
+
+    ```bash
+    # Enable lingering (allows user services to run without active session)
+    sudo loginctl enable-linger openclaw
+
+    # Install the systemd service
+    openclaw daemon install
+
+    # Reload and start the service
+    systemctl --user daemon-reload
+    systemctl --user enable --now openclaw-gateway
+    
+    # Check status
+    systemctl --user status openclaw-gateway
+    ```
+
+    <Aside type="caution">
+    If you see an error about "systemd user services unavailable", ensure you exported `XDG_RUNTIME_DIR` in Step 5 and that `loginctl enable-linger` was run successfully.
+    </Aside>
+
+9.  **Security Audit**
+
+    Run the built-in security auditor to detect and fix potential vulnerabilities.
+
+    ```bash
+    # Deep scan
+    openclaw security audit --deep
+    
+    # Auto-fix issues
+    openclaw security audit --fix
+    ```
+
+10. **Pairing**
+
+    Connect your Telegram account to the running agent.
+
+    1.  Open Telegram and start a chat with your bot.
+    2.  The bot will reply with a **Pairing Code** (e.g., `123-456`).
+    3.  Approve the pairing in the terminal:
+
+    ```bash
+    openclaw pairing approve telegram YOUR_CODE
+    ```
+
+</Steps>
+
+## Verification
+
+Your OpenClaw agent should now be online and responding to messages on Telegram. You can verify its status locally:
+
+```bash
+openclaw gateway status
+```
